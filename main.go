@@ -20,6 +20,13 @@ import (
 	"time"
 )
 
+// Arg ...
+type Arg struct {
+	Addr    *string
+	DbPath  *string
+	Verbose *bool
+}
+
 // Setting ...
 type Setting struct {
 	Uploaded    [2]float64
@@ -45,6 +52,21 @@ var (
 	incompleteMatcher = regexp.MustCompile(`10:incompletei(\d+)e`)
 	queryMatcher      = regexp.MustCompile(`(^|&)uploaded=\d+(&|$)`)
 )
+
+func parseArg() Arg {
+	var arg Arg
+	defaultDbPath := ":memory:"
+	if usr, err := user.Current(); err != nil {
+		log.Print(err)
+	} else {
+		defaultDbPath = filepath.Join(usr.HomeDir, ".torrent-ratio.db")
+	}
+	arg.Verbose = flag.Bool("v", false, "enable verbose logging")
+	arg.Addr = flag.String("addr", "127.0.0.1:8082", "proxy listen address")
+	arg.DbPath = flag.String("db", defaultDbPath, "database path")
+	flag.Parse()
+	return arg
+}
 
 func getInt64(query *url.Values, key string) int64 {
 	i, err := strconv.ParseInt(query.Get(key), 10, 64)
@@ -163,14 +185,10 @@ func format(num int64) string {
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
-	usr, _ := user.Current()
 
-	verbose := flag.Bool("v", false, "enable verbose logging")
-	addr := flag.String("addr", "127.0.0.1:8082", "proxy listen address")
-	dbPath := flag.String("db", filepath.Join(usr.HomeDir, ".torrent-ratio.db"), "database path")
-	flag.Parse()
+	arg := parseArg()
 
-	db, err := sql.Open("sqlite3", *dbPath)
+	db, err := sql.Open("sqlite3", *arg.DbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -307,6 +325,6 @@ func main() {
 		return resp
 	})
 
-	proxy.Verbose = *verbose
-	log.Fatal(http.ListenAndServe(*addr, proxy))
+	proxy.Verbose = *arg.Verbose
+	log.Fatal(http.ListenAndServe(*arg.Addr, proxy))
 }
