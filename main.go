@@ -226,9 +226,9 @@ func main() {
 			log.Print(err)
 		}
 		epoch := time.Now().Unix()
-		fmt.Fprintln(w, "info_hash                                uploaded     downloaded announced incomplete host")
+		fmt.Fprintln(w, "info_hash                                uploaded      downloaded announced incomplete host")
 		for _, reqInfo := range reqInfos {
-			fmt.Fprintf(w, "%x %-6s%-6s %-10s %-9d %-10d %s\n",
+			fmt.Fprintf(w, "%x %-6s %-6s %-10s %-9d %-10d %s\n",
 				reqInfo.InfoHash,
 				format(reqInfo.ReportUploaded),
 				format(reqInfo.Uploaded),
