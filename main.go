@@ -12,7 +12,6 @@ import (
 	"math"
 	"math/rand"
 	"net/http"
-	"net/url"
 	"os/user"
 	"path/filepath"
 	"regexp"
@@ -159,10 +158,11 @@ func parseArg() Arg {
 	return arg
 }
 
-func getInt64(query *url.Values, key string) int64 {
+func queryInt64(ctx *goproxy.ProxyCtx, key string) int64 {
+	query := ctx.Req.URL.Query()
 	i, err := strconv.ParseInt(query.Get(key), 10, 64)
 	if err != nil {
-		log.Print(err)
+		ctx.Warnf("%s", err)
 		i = -1
 	}
 	return i
@@ -336,8 +336,8 @@ func main() {
 		var reqInfo ReqInfo
 		query := req.URL.Query()
 		reqInfo.InfoHash = query.Get("info_hash")
-		reqInfo.Uploaded = getInt64(&query, "uploaded")
-		reqInfo.Downloaded = getInt64(&query, "downloaded")
+		reqInfo.Uploaded = queryInt64(ctx, "uploaded")
+		reqInfo.Downloaded = queryInt64(ctx, "downloaded")
 		if reqInfo.InfoHash == "" || reqInfo.Uploaded < 0 || reqInfo.Downloaded < 0 {
 			return goproxy.NEXT
 		}
@@ -406,7 +406,7 @@ func main() {
 					query := ctx.Req.URL.Query()
 					infoHash := query.Get("info_hash")
 					incomplete, _ := strconv.ParseInt(string(match[1]), 10, 64)
-					if getInt64(&query, "left") > 0 || query.Get("event") == "completed" {
+					if queryInt64(ctx, "left") > 0 || query.Get("event") == "completed" {
 						incomplete--
 					}
 					if err := saveIncomplete(db, infoHash, incomplete); err != nil {
