@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"github.com/abourget/goproxy"
 	_ "github.com/mattn/go-sqlite3"
+	"golang.org/x/crypto/ssh/terminal"
 	"io/ioutil"
 	"log"
 	"math"
 	"math/rand"
 	"net/http"
+	"os"
 	"os/user"
 	"path/filepath"
 	"regexp"
@@ -418,6 +420,11 @@ func main() {
 		}
 		return goproxy.NEXT
 	})
+
+	if !terminal.IsTerminal(int(os.Stdout.Fd())) {
+		log.SetFlags(0)
+		proxy.Logger.SetFlags(0)
+	}
 
 	proxy.Verbose = *arg.Verbose
 	log.Fatal(proxy.ListenAndServe(*arg.Addr))
