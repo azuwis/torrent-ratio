@@ -315,21 +315,26 @@ func main() {
 	proxy.HandleConnect(goproxy.AlwaysMitm)
 
 	proxy.NonProxyHandler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		reqInfos, err := loadAllReqInfo(db)
-		if err != nil {
-			log.Print(err)
-		}
-		epoch := time.Now().Unix()
-		fmt.Fprintln(w, "hash     up            down   ann. inc. host")
-		for _, reqInfo := range reqInfos {
-			fmt.Fprintf(w, "%.4x %-6s %-6s %-6s %-4d %-4d %s\n",
-				reqInfo.InfoHash,
-				format(reqInfo.ReportUploaded),
-				format(reqInfo.Uploaded),
-				format(reqInfo.Downloaded),
-				(epoch-reqInfo.Epoch)/60,
-				reqInfo.Incomplete,
-				reqInfo.Host)
+		switch req.URL.Path {
+		case "/":
+			reqInfos, err := loadAllReqInfo(db)
+			if err != nil {
+				log.Print(err)
+			}
+			epoch := time.Now().Unix()
+			fmt.Fprintln(w, "hash     up            down   ann. inc. host")
+			for _, reqInfo := range reqInfos {
+				fmt.Fprintf(w, "%.4x %-6s %-6s %-6s %-4d %-4d %s\n",
+					reqInfo.InfoHash,
+					format(reqInfo.ReportUploaded),
+					format(reqInfo.Uploaded),
+					format(reqInfo.Downloaded),
+					(epoch-reqInfo.Epoch)/60,
+					reqInfo.Incomplete,
+					reqInfo.Host)
+			}
+		default:
+			http.NotFound(w, req)
 		}
 	})
 
