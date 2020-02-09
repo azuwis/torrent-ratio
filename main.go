@@ -399,7 +399,7 @@ func main() {
 
 	proxy.HandleResponseFunc(func(ctx *goproxy.ProxyCtx) goproxy.Next {
 		resp := ctx.Resp
-		if resp.StatusCode == http.StatusOK {
+		if resp != nil && resp.StatusCode == http.StatusOK {
 			if bodyBytes, err := ioutil.ReadAll(resp.Body); err != nil {
 				ctx.Warnf("%s", err)
 			} else {
