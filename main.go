@@ -358,14 +358,14 @@ func main() {
 		reqInfo.ReportUploaded = reqInfo.Uploaded
 		reqInfo.Incomplete = int64(-2)
 		init := ""
-		if query.Get("event") != "started" {
-			if prevReqInfo, err := loadReqInfo(db, reqInfo.InfoHash); err != nil {
-				if err != sql.ErrNoRows {
-					ctx.Warnf("%s", err)
-				} else {
-					init = "init, "
-				}
+		if prevReqInfo, err := loadReqInfo(db, reqInfo.InfoHash); err != nil {
+			if err != sql.ErrNoRows {
+				ctx.Warnf("%s", err)
 			} else {
+				init = "init, "
+			}
+		} else {
+			if query.Get("event") != "started" {
 				// ctx.Warnf("prevReqInfo: %+v", prevReqInfo)
 				deltaUploaded := reqInfo.Uploaded - prevReqInfo.Uploaded
 				deltaDownloaded := reqInfo.Downloaded - prevReqInfo.Downloaded
