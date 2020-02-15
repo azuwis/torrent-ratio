@@ -6,8 +6,10 @@ import (
 	"flag"
 	"fmt"
 	"github.com/abourget/goproxy"
+	"github.com/kr/pretty"
 	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/ssh/terminal"
+	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
 	"math"
@@ -24,6 +26,7 @@ import (
 // Arg ...
 type Arg struct {
 	Addr    *string
+	Conf    *string
 	DbPath  *string
 	Verbose *bool
 }
@@ -147,17 +150,44 @@ cj/azKBaT04IOMLaN8xfSqitJYSraWMVNgGJM5vfcVaivZnNh0lZBv+qu6YkdM88
 
 func parseArg() Arg {
 	var arg Arg
+	defaultConfPath := ""
 	defaultDbPath := ":memory:"
 	if usr, err := user.Current(); err != nil {
 		log.Print(err)
 	} else {
+		defaultConfPath = filepath.Join(usr.HomeDir, ".torrent-ratio.yaml")
 		defaultDbPath = filepath.Join(usr.HomeDir, ".torrent-ratio.db")
 	}
 	arg.Verbose = flag.Bool("v", false, "enable verbose logging")
 	arg.Addr = flag.String("addr", "127.0.0.1:8082", "proxy listen address")
+	arg.Conf = flag.String("conf", defaultConfPath, "config file")
 	arg.DbPath = flag.String("db", defaultDbPath, "database path")
 	flag.Parse()
 	return arg
+}
+
+func loadConfig(file string) map[string]Setting {
+	config := map[string]Setting{
+		"default": {
+			Uploaded:    [2]float64{0.1, 0.6},
+			Downloaded:  [2]float64{0, 0.07},
+			PercentMin:  0.2,
+			PercentMax:  0.5,
+			PercentStep: 0.02,
+			Speed:       51200,
+		},
+	}
+	yamlFile, err := ioutil.ReadFile(file)
+	if err != nil {
+		if ! os.IsNotExist(err) {
+			log.Print(err)
+		}
+	}
+	err = yaml.Unmarshal(yamlFile, &config)
+	if err != nil {
+		log.Print(err)
+	}
+	return config
 }
 
 func queryInt64(ctx *goproxy.ProxyCtx, key string) int64 {
@@ -292,23 +322,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	config := map[string]Setting{
-		"default": {
-			Uploaded:    [2]float64{0.1, 0.6},
-			Downloaded:  [2]float64{0, 0.07},
-			PercentMin:  0.2,
-			PercentMax:  0.5,
-			PercentStep: 0.02,
-			Speed:       51200,
-		},
-		"127.0.0.1": {
-			Uploaded:    [2]float64{2, 2},
-			Downloaded:  [2]float64{1, 1},
-			PercentMin:  0,
-			PercentMax:  0,
-			PercentStep: 0.02,
-			Speed:       51200,
-		},
+	config := loadConfig(*arg.Conf)
+	if (*arg.Verbose) {
+		log.Printf("CONFIG: %# v", pretty.Formatter(config))
 	}
 
 	proxy := goproxy.NewProxyHttpServer()
