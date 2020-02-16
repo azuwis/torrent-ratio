@@ -29,6 +29,7 @@ type Arg struct {
 	Conf    *string
 	DbPath  *string
 	Verbose *bool
+	Version *bool
 }
 
 // Setting ...
@@ -55,6 +56,7 @@ type ReqInfo struct {
 var (
 	incompleteMatcher = regexp.MustCompile(`10:incompletei(\d+)e`)
 	queryMatcher      = regexp.MustCompile(`(^|&)uploaded=\d+(&|$)`)
+	Version           = "v0.2"
 )
 
 func loadCA() {
@@ -158,10 +160,11 @@ func parseArg() Arg {
 		defaultConfPath = filepath.Join(usr.HomeDir, ".torrent-ratio.yaml")
 		defaultDbPath = filepath.Join(usr.HomeDir, ".torrent-ratio.db")
 	}
-	arg.Verbose = flag.Bool("v", false, "enable verbose logging")
 	arg.Addr = flag.String("addr", "127.0.0.1:8082", "proxy listen address")
 	arg.Conf = flag.String("conf", defaultConfPath, "config file")
 	arg.DbPath = flag.String("db", defaultDbPath, "database path")
+	arg.Verbose = flag.Bool("v", false, "enable verbose logging")
+	arg.Version = flag.Bool("V", false, "print version")
 	flag.Parse()
 	return arg
 }
@@ -179,7 +182,7 @@ func loadConfig(file string) map[string]Setting {
 	}
 	yamlFile, err := ioutil.ReadFile(file)
 	if err != nil {
-		if ! os.IsNotExist(err) {
+		if !os.IsNotExist(err) {
 			log.Print(err)
 		}
 	}
@@ -307,10 +310,17 @@ func format(num int64) string {
 }
 
 func main() {
-	loadCA()
-	rand.Seed(time.Now().UnixNano())
+	isTerminal := terminal.IsTerminal(int(os.Stdout.Fd()))
+	if !isTerminal {
+		log.SetFlags(0)
+	}
 
 	arg := parseArg()
+
+	if *arg.Version {
+		log.SetFlags(0)
+		log.Fatal(Version)
+	}
 
 	db, err := sql.Open("sqlite3", *arg.DbPath)
 	if err != nil {
@@ -323,12 +333,19 @@ func main() {
 	}
 
 	config := loadConfig(*arg.Conf)
-	if (*arg.Verbose) {
+	if *arg.Verbose {
 		log.Printf("CONFIG: %# v", pretty.Formatter(config))
 	}
 
+	loadCA()
+	rand.Seed(time.Now().UnixNano())
+
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.HandleConnect(goproxy.AlwaysMitm)
+
+	if !isTerminal {
+		proxy.Logger.SetFlags(0)
+	}
 
 	proxy.NonProxyHandler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		switch req.URL.Path {
@@ -441,11 +458,6 @@ func main() {
 		}
 		return goproxy.NEXT
 	})
-
-	if !terminal.IsTerminal(int(os.Stdout.Fd())) {
-		log.SetFlags(0)
-		proxy.Logger.SetFlags(0)
-	}
 
 	proxy.Verbose = *arg.Verbose
 	log.Fatal(proxy.ListenAndServe(*arg.Addr))
