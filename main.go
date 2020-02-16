@@ -56,7 +56,7 @@ type ReqInfo struct {
 var (
 	incompleteMatcher = regexp.MustCompile(`10:incompletei(\d+)e`)
 	queryMatcher      = regexp.MustCompile(`(^|&)uploaded=\d+(&|$)`)
-	Version           = "v0.2"
+	Version           = "v0.3"
 )
 
 func loadCA() {
