@@ -299,6 +299,22 @@ func loadAllReqInfo(db *sql.DB) ([]ReqInfo, error) {
 	return result, err
 }
 
+func cleanup(db *sql.DB) {
+	sql := `DELETE FROM torrent WHERE Epoch < ?`
+	for {
+		result, err := db.Exec(sql, time.Now().Unix() - 86400)
+		if err != nil {
+			log.Print(err)
+		}
+		count, err := result.RowsAffected()
+		if err != nil {
+			log.Print(err)
+		}
+		log.Printf("CLEANUP: %d", count)
+		time.Sleep(24 * time.Hour)
+	}
+}
+
 func format(num int64) string {
 	float := float64(num)
 	for _, unit := range []string{"", "K", "M", "G"} {
@@ -460,6 +476,7 @@ func main() {
 		return goproxy.NEXT
 	})
 
+	go cleanup(db)
 	proxy.Verbose = *arg.Verbose
 	log.Fatal(proxy.ListenAndServe(*arg.Addr))
 }
