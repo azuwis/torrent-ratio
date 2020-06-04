@@ -56,6 +56,7 @@ type ReqInfo struct {
 var (
 	incompleteMatcher = regexp.MustCompile(`10:incompletei(\d+)e`)
 	queryMatcher      = regexp.MustCompile(`(^|&)uploaded=\d+(&|$)`)
+	// Version info
 	Version           = "v0.3"
 )
 
