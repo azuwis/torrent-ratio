@@ -5,6 +5,7 @@ default: &default
   percentmax: 0.5
   percentstep: 0.02
   speed: 51200
+  port: 0
 
 high: &high
   uploaded: [2, 4]

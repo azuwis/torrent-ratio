@@ -40,6 +40,7 @@ type Setting struct {
 	PercentMax  float64
 	PercentStep float64
 	Speed       int64
+	Port        int64
 }
 
 // ReqInfo ...
@@ -55,7 +56,8 @@ type ReqInfo struct {
 
 var (
 	incompleteMatcher = regexp.MustCompile(`10:incompletei(\d+)e`)
-	queryMatcher      = regexp.MustCompile(`(^|&)uploaded=\d+(&|$)`)
+	portMatcher       = regexp.MustCompile(`(^|&)port=\d+(&|$)`)
+	uploadedMatcher   = regexp.MustCompile(`(^|&)uploaded=\d+(&|$)`)
 	// Version info
 	Version           = "v0.4"
 )
@@ -179,6 +181,7 @@ func loadConfig(file string) map[string]Setting {
 			PercentMax:  0.5,
 			PercentStep: 0.02,
 			Speed:       51200,
+			Port:       0,
 		},
 	}
 	yamlFile, err := ioutil.ReadFile(file)
@@ -404,6 +407,10 @@ func main() {
 			setting = hostSetting
 		}
 		// ctx.Warnf("setting: %+v", setting)
+		if (setting.Port > 0 && setting.Port < 65536) {
+			req.URL.RawQuery = portMatcher.ReplaceAllString(req.URL.RawQuery,
+				fmt.Sprintf("${1}port=%d${2}", setting.Port))
+		}
 		reqInfo.Epoch = time.Now().Unix()
 		reqInfo.ReportUploaded = reqInfo.Uploaded
 		reqInfo.Incomplete = int64(-2)
@@ -433,7 +440,7 @@ func main() {
 					}
 					// query.Set("uploaded", strconv.FormatInt(reqInfo.ReportUploaded, 10))
 					// req.URL.RawQuery = query.Encode()
-					req.URL.RawQuery = queryMatcher.ReplaceAllString(req.URL.RawQuery,
+					req.URL.RawQuery = uploadedMatcher.ReplaceAllString(req.URL.RawQuery,
 						fmt.Sprintf("${1}uploaded=%d${2}", reqInfo.ReportUploaded))
 				}
 			}
