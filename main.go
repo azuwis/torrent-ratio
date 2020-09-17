@@ -59,7 +59,7 @@ var (
 	portMatcher       = regexp.MustCompile(`(^|&)port=\d+(&|$)`)
 	uploadedMatcher   = regexp.MustCompile(`(^|&)uploaded=\d+(&|$)`)
 	// Version info
-	Version           = "v0.4"
+	Version           = "v0.5"
 )
 
 func loadCA() {
