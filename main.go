@@ -59,7 +59,7 @@ var (
 	portMatcher       = regexp.MustCompile(`(^|&)port=\d+(&|$)`)
 	uploadedMatcher   = regexp.MustCompile(`(^|&)uploaded=\d+(&|$)`)
 	// Version info
-	Version           = "v0.5"
+	Version = "v0.5"
 )
 
 func loadCA() {
@@ -181,7 +181,7 @@ func loadConfig(file string) map[string]Setting {
 			PercentMax:  0.5,
 			PercentStep: 0.02,
 			Speed:       51200,
-			Port:       0,
+			Port:        0,
 		},
 	}
 	yamlFile, err := ioutil.ReadFile(file)
@@ -305,7 +305,7 @@ func loadAllReqInfo(db *sql.DB) ([]ReqInfo, error) {
 func cleanup(db *sql.DB) {
 	sql := `DELETE FROM torrent WHERE Epoch < ?`
 	for {
-		result, err := db.Exec(sql, time.Now().Unix() - 86400)
+		result, err := db.Exec(sql, time.Now().Unix()-86400)
 		if err != nil {
 			log.Print(err)
 		}
@@ -407,7 +407,7 @@ func main() {
 			setting = hostSetting
 		}
 		// ctx.Warnf("setting: %+v", setting)
-		if (setting.Port > 0 && setting.Port < 65536) {
+		if setting.Port > 0 && setting.Port < 65536 {
 			req.URL.RawQuery = portMatcher.ReplaceAllString(req.URL.RawQuery,
 				fmt.Sprintf("${1}port=%d${2}", setting.Port))
 		}
