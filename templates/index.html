@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Torrent Radio</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/svg+xml" href="static/favicon.svg">
+    <link rel="stylesheet" href="static/style.css">
+    <script src="static/tablesort.js"></script>
+  </head>
+  <body>
+    <table id="torrent" class="pure-table pure-table-bordered pure-table-striped">
+      <thead>
+        <tr>
+          <th>Hash</th>
+          <th title="Report">R</th>
+          <th title="Upload">U</th>
+          <th title="download">D</th>
+          <th title="Announce">A</th>
+          <th title="Incomplete">I</th>
+          <th>Host</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{- range . }}
+        <tr>
+          <td>{{ .InfoHash | printf "%.4x" }}</td>
+          <td>{{ .ReportUploaded | format }}</td>
+          <td>{{ .Uploaded | format }}</td>
+          <td>{{ .Downloaded | format }}</td>
+          <td>{{ .Epoch | ago }}</td>
+          <td>{{ .Incomplete }}</td>
+          <td>{{ .Host }}</td>
+        </tr>
+        {{- end }}
+      </tbody>
+    </table>
+  </body>
+  <script>
+  new Tablesort(document.getElementById('torrent'));
+  </script>
+</html>

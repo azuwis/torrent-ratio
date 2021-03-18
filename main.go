@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"database/sql"
+	"embed"
 	"flag"
 	"fmt"
 	"github.com/abourget/goproxy"
@@ -10,6 +11,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/ssh/terminal"
 	"gopkg.in/yaml.v2"
+	"html/template"
 	"io/ioutil"
 	"log"
 	"math"
@@ -20,8 +22,12 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
+
+//go:embed static templates
+var embedFS embed.FS
 
 // Arg ...
 type Arg struct {
@@ -329,6 +335,10 @@ func format(num int64) string {
 	return fmt.Sprintf("%3.1f%s", float, "T")
 }
 
+func ago(epoch int64) int64 {
+	return (time.Now().Unix() - epoch) / 60
+}
+
 func main() {
 	isTerminal := terminal.IsTerminal(int(os.Stdout.Fd()))
 	if !isTerminal {
@@ -367,7 +377,16 @@ func main() {
 		proxy.Logger.SetFlags(0)
 	}
 
+	templates, err := template.New("").Funcs(template.FuncMap{
+		"format": format,
+		"ago":    ago,
+	}).ParseFS(embedFS, "templates/*")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	mux := http.NewServeMux()
+	mux.Handle("/static/", http.FileServer(http.FS(embedFS)))
 	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		switch req.URL.Path {
 		case "/", "/index.html":
@@ -375,17 +394,22 @@ func main() {
 			if err != nil {
 				log.Print(err)
 			}
-			epoch := time.Now().Unix()
-			fmt.Fprintln(w, "hash     up            down   ann. inc. host")
-			for _, reqInfo := range reqInfos {
-				fmt.Fprintf(w, "%.4x %-6s %-6s %-6s %-4d %-4d %s\n",
-					reqInfo.InfoHash,
-					format(reqInfo.ReportUploaded),
-					format(reqInfo.Uploaded),
-					format(reqInfo.Downloaded),
-					(epoch-reqInfo.Epoch)/60,
-					reqInfo.Incomplete,
-					reqInfo.Host)
+			if strings.HasPrefix(req.UserAgent(), "Mozilla/") {
+				if err := templates.ExecuteTemplate(w, "index.html", reqInfos); err != nil {
+					log.Print(err)
+				}
+			} else {
+				fmt.Fprintln(w, "hash     up            down   ann. inc. host")
+				for _, reqInfo := range reqInfos {
+					fmt.Fprintf(w, "%.4x %-6s %-6s %-6s %-4d %-4d %s\n",
+						reqInfo.InfoHash,
+						format(reqInfo.ReportUploaded),
+						format(reqInfo.Uploaded),
+						format(reqInfo.Downloaded),
+						ago(reqInfo.Epoch),
+						reqInfo.Incomplete,
+						reqInfo.Host)
+				}
 			}
 		default:
 			http.NotFound(w, req)

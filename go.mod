@@ -1,6 +1,6 @@
 module github.com/azuwis/torrent-ratio
 
-go 1.13
+go 1.16
 
 require (
 	github.com/abourget/goproxy v0.0.0-20170220221050-fcf497103e7b
