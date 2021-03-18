@@ -367,9 +367,10 @@ func main() {
 		proxy.Logger.SetFlags(0)
 	}
 
-	proxy.NonProxyHandler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		switch req.URL.Path {
-		case "/":
+		case "/", "/index.html":
 			reqInfos, err := loadAllReqInfo(db)
 			if err != nil {
 				log.Print(err)
@@ -390,6 +391,7 @@ func main() {
 			http.NotFound(w, req)
 		}
 	})
+	proxy.NonProxyHandler = mux
 
 	proxy.HandleRequestFunc(func(ctx *goproxy.ProxyCtx) goproxy.Next {
 		req := ctx.Req
