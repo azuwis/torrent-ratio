@@ -320,7 +320,7 @@ func cleanup(db *sql.DB) {
 
 func format(num int64) string {
 	float := float64(num)
-	for _, unit := range []string{"", "K", "M", "G"} {
+	for _, unit := range []string{"B", "K", "M", "G"} {
 		if math.Abs(float) < float64(1024) {
 			return fmt.Sprintf("%3.1f%s", float, unit)
 		}
