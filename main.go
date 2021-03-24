@@ -389,7 +389,7 @@ func main() {
 	lastModified := time.Now()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/static/", func(w http.ResponseWriter, r *http.Request) {
-	    name := strings.TrimPrefix(r.URL.Path, "/")
+		name := strings.TrimPrefix(r.URL.Path, "/")
 		file, err := embedFS.Open(name)
 		if err != nil {
 			http.NotFound(w, r)
