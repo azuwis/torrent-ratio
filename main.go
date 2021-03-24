@@ -12,6 +12,7 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 	"gopkg.in/yaml.v2"
 	"html/template"
+	"io"
 	"io/ioutil"
 	"log"
 	"math"
@@ -385,8 +386,18 @@ func main() {
 		log.Fatal(err)
 	}
 
+	lastModified := time.Now()
 	mux := http.NewServeMux()
-	mux.Handle("/static/", http.FileServer(http.FS(embedFS)))
+	mux.HandleFunc("/static/", func(w http.ResponseWriter, r *http.Request) {
+	    name := strings.TrimPrefix(r.URL.Path, "/")
+		file, err := embedFS.Open(name)
+		if err != nil {
+			http.NotFound(w, r)
+		} else {
+			defer file.Close()
+			http.ServeContent(w, r, name, lastModified, file.(io.ReadSeeker))
+		}
+	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		switch req.URL.Path {
 		case "/", "/index.html":
