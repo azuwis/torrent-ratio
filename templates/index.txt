@@ -1,4 +1,4 @@
 hash     up            down   ann. inc. host
 {{- range . }}
-{{ .InfoHash | printf "%.4x" }} {{ .ReportUploaded | format | printf "%-6s" }} {{ .Uploaded | format | printf "%-6s" }} {{ .Downloaded | format | printf "%-6s" }} {{ .Epoch | ago | printf "%-4d" }} {{ .Incomplete | printf "%-4d" }} {{ .Host }}
+{{ printf "%.4x %-6s %-6s %-6s %-4d %-4d %s" .InfoHash (format .ReportUploaded) (format .Uploaded) (format .Downloaded) (ago .Epoch) .Incomplete .Host }}
 {{- end }}
