@@ -398,14 +398,14 @@ func main() {
 			http.ServeContent(w, r, name, lastModified, file.(io.ReadSeeker))
 		}
 	})
-	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
-		switch req.URL.Path {
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
 		case "/", "/index.html":
 			reqInfos, err := loadAllReqInfo(db)
 			if err != nil {
 				log.Print(err)
 			}
-			if strings.HasPrefix(req.UserAgent(), "Mozilla/") {
+			if strings.HasPrefix(r.UserAgent(), "Mozilla/") {
 				if err := templates.ExecuteTemplate(w, "index.html", reqInfos); err != nil {
 					log.Print(err)
 				}
@@ -423,7 +423,7 @@ func main() {
 				}
 			}
 		default:
-			http.NotFound(w, req)
+			http.NotFound(w, r)
 		}
 	})
 	proxy.NonProxyHandler = mux
