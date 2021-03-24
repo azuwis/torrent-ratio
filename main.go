@@ -399,30 +399,26 @@ func main() {
 		}
 	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/", "/index.html":
-			reqInfos, err := loadAllReqInfo(db)
-			if err != nil {
-				log.Print(err)
-			}
+		name := r.URL.Path
+		if strings.HasSuffix(name, "/") {
 			if strings.HasPrefix(r.UserAgent(), "Mozilla/") {
-				if err := templates.ExecuteTemplate(w, "index.html", reqInfos); err != nil {
-					log.Print(err)
-				}
+				name += "index.html"
 			} else {
-				fmt.Fprintln(w, "hash     up            down   ann. inc. host")
-				for _, reqInfo := range reqInfos {
-					fmt.Fprintf(w, "%.4x %-6s %-6s %-6s %-4d %-4d %s\n",
-						reqInfo.InfoHash,
-						format(reqInfo.ReportUploaded),
-						format(reqInfo.Uploaded),
-						format(reqInfo.Downloaded),
-						ago(reqInfo.Epoch),
-						reqInfo.Incomplete,
-						reqInfo.Host)
+				name += "index.txt"
+			}
+		}
+		name = strings.TrimPrefix(name, "/")
+		if t := templates.Lookup(name); t != nil {
+			if reqInfos, err := loadAllReqInfo(db); err != nil {
+				log.Print(err)
+				http.Error(w, err.Error(), 500)
+			} else {
+				if err := t.Execute(w, reqInfos); err != nil {
+					log.Print(err)
+					http.Error(w, err.Error(), 500)
 				}
 			}
-		default:
+		} else {
 			http.NotFound(w, r)
 		}
 	})
