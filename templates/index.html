@@ -13,7 +13,7 @@
       <thead>
         <tr>
           <th>Hash</th>
-          <th title="Report">R</th>
+          <th title="Report" data-sort-default>R</th>
           <th title="Upload">U</th>
           <th title="download">D</th>
           <th title="Announce">A</th>
@@ -37,6 +37,6 @@
     </table>
   </body>
   <script>
-  new Tablesort(document.getElementById('torrent'));
+  new Tablesort(document.getElementById('torrent'), {descending: true});
   </script>
 </html>
