@@ -48,6 +48,7 @@ type Setting struct {
 	PercentStep float64
 	Speed       int64
 	Port        int64
+	PeerId      string
 }
 
 // ReqInfo ...
@@ -63,6 +64,7 @@ type ReqInfo struct {
 
 var (
 	incompleteMatcher = regexp.MustCompile(`10:incompletei(\d+)e`)
+	peerIdMatcher     = regexp.MustCompile(`(^|&)peer_id=-[A-Za-z0-9]{6}-`)
 	portMatcher       = regexp.MustCompile(`(^|&)port=\d+(&|$)`)
 	uploadedMatcher   = regexp.MustCompile(`(^|&)uploaded=\d+(&|$)`)
 	// Version info
@@ -189,6 +191,7 @@ func loadConfig(file string) map[string]Setting {
 			PercentStep: 0.02,
 			Speed:       51200,
 			Port:        0,
+			PeerId:      "",
 		},
 	}
 	yamlFile, err := ioutil.ReadFile(file)
@@ -440,6 +443,10 @@ func main() {
 			setting = hostSetting
 		}
 		// ctx.Warnf("setting: %+v", setting)
+		if setting.PeerId != "" {
+			req.URL.RawQuery = peerIdMatcher.ReplaceAllString(req.URL.RawQuery,
+				fmt.Sprintf("${1}peer_id=-%s-", setting.PeerId))
+		}
 		if setting.Port > 0 && setting.Port < 65536 {
 			req.URL.RawQuery = portMatcher.ReplaceAllString(req.URL.RawQuery,
 				fmt.Sprintf("${1}port=%d${2}", setting.Port))

@@ -6,6 +6,7 @@ default: &default
   percentstep: 0.02
   speed: 51200
   port: 0
+  peerid: ""
 
 high: &high
   <<: *default
