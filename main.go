@@ -452,25 +452,32 @@ func main() {
 				fmt.Sprintf("${1}port=%d${2}", setting.Port))
 		}
 		reqInfo.Epoch = time.Now().Unix()
+		// initial value to save
 		reqInfo.ReportUploaded = reqInfo.Uploaded
+		// -2 means not previous info
 		reqInfo.Incomplete = int64(-2)
 		init := ""
 		if prevReqInfo, err := loadReqInfo(db, reqInfo.InfoHash); err != nil {
+			// info not exists from DB
 			if err != sql.ErrNoRows {
 				ctx.Warnf("%s", err)
 			} else {
 				init = "init, "
 			}
 		} else {
+			// info loaded from DB
 			if query.Get("event") != "started" {
+				// event is not started, calculate reported uploaded
 				// ctx.Warnf("prevReqInfo: %+v", prevReqInfo)
 				deltaUploaded := reqInfo.Uploaded - prevReqInfo.Uploaded
 				deltaDownloaded := reqInfo.Downloaded - prevReqInfo.Downloaded
 				deltaEpoch := reqInfo.Epoch - prevReqInfo.Epoch
 				if deltaUploaded >= 0 && deltaDownloaded >= 0 && deltaEpoch <= 10800 {
+					// make sure the info from DB is new
 					reqInfo.ReportUploaded = prevReqInfo.ReportUploaded
 					reqInfo.ReportUploaded += deltaUploaded
 					if prevReqInfo.Incomplete >= 1 {
+						// have some downloaders
 						reqInfo.ReportUploaded += int64(float64(deltaUploaded) * randRange(setting.Uploaded))
 						reqInfo.ReportUploaded += int64(float64(deltaDownloaded) * randRange(setting.Downloaded))
 						percent := math.Min(setting.PercentMin+float64(prevReqInfo.Incomplete-1)*setting.PercentStep, setting.PercentMax)
@@ -484,6 +491,7 @@ func main() {
 						fmt.Sprintf("${1}uploaded=%d${2}", reqInfo.ReportUploaded))
 				}
 			}
+			// event is started
 		}
 		if err := saveReqInfo(db, reqInfo); err != nil {
 			ctx.Warnf("%s", err)
@@ -511,8 +519,10 @@ func main() {
 					infoHash := query.Get("info_hash")
 					incomplete, _ := strconv.ParseInt(string(match[1]), 10, 64)
 					if queryInt64(ctx, "left") > 0 || query.Get("event") == "completed" {
+					// downloading, exclude self from downloaders
 						incomplete--
 					}
+					// save incomplete
 					if err := saveIncomplete(db, infoHash, incomplete); err != nil {
 						ctx.Warnf("%s", err)
 					}
