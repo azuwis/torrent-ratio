@@ -430,6 +430,10 @@ func main() {
 	proxy.HandleRequestFunc(func(ctx *goproxy.ProxyCtx) goproxy.Next {
 		req := ctx.Req
 		var reqInfo ReqInfo
+		reqInfo.Host = req.URL.Hostname()
+		if reqInfo.Host == "127.0.0.1" || ! strings.Contains(strings.Trim(reqInfo.Host, "."), ".") {
+      return goproxy.REJECT;
+    }
 		query := req.URL.Query()
 		reqInfo.InfoHash = query.Get("info_hash")
 		reqInfo.Uploaded = queryInt64(ctx, "uploaded")
@@ -437,7 +441,6 @@ func main() {
 		if reqInfo.InfoHash == "" || reqInfo.Uploaded < 0 || reqInfo.Downloaded < 0 {
 			return goproxy.NEXT
 		}
-		reqInfo.Host = req.URL.Hostname()
 		setting := config["default"]
 		if hostSetting, ok := config[reqInfo.Host]; ok {
 			setting = hostSetting
