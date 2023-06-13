@@ -454,7 +454,7 @@ func main() {
 		reqInfo.Epoch = time.Now().Unix()
 		// initial value to save
 		reqInfo.ReportUploaded = reqInfo.Uploaded
-		// -2 means not previous info
+		// -2 means no previous info
 		reqInfo.Incomplete = int64(-2)
 		init := ""
 		if prevReqInfo, err := loadReqInfo(db, reqInfo.InfoHash); err != nil {
