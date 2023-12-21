@@ -17,6 +17,7 @@ import (
 	"log"
 	"math"
 	"math/rand"
+	"net"
 	"net/http"
 	"os"
 	"os/user"
@@ -426,6 +427,15 @@ func main() {
 		}
 	})
 	proxy.NonProxyHandler = mux
+
+	proxy.Transport.Dial = func(network, addr string) (c net.Conn, err error) {
+		tcpaddr, err := net.ResolveTCPAddr(network, addr)
+		if err == nil && !tcpaddr.IP.IsPrivate() {
+			return net.Dial(network, tcpaddr.String())
+		} else {
+			return
+		}
+	}
 
 	proxy.HandleRequestFunc(func(ctx *goproxy.ProxyCtx) goproxy.Next {
 		req := ctx.Req
