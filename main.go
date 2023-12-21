@@ -441,9 +441,9 @@ func main() {
 		req := ctx.Req
 		var reqInfo ReqInfo
 		reqInfo.Host = req.URL.Hostname()
-		if reqInfo.Host == "127.0.0.1" || ! strings.Contains(strings.Trim(reqInfo.Host, "."), ".") {
-      return goproxy.REJECT;
-    }
+		if reqInfo.Host == "127.0.0.1" || !strings.Contains(strings.Trim(reqInfo.Host, "."), ".") {
+			return goproxy.REJECT
+		}
 		query := req.URL.Query()
 		reqInfo.InfoHash = query.Get("info_hash")
 		reqInfo.Uploaded = queryInt64(ctx, "uploaded")
@@ -532,7 +532,7 @@ func main() {
 					infoHash := query.Get("info_hash")
 					incomplete, _ := strconv.ParseInt(string(match[1]), 10, 64)
 					if queryInt64(ctx, "left") > 0 || query.Get("event") == "completed" {
-					// downloading, exclude self from downloaders
+						// downloading, exclude self from downloaders
 						incomplete--
 					}
 					// save incomplete
