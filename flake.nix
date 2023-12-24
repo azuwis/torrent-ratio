@@ -10,7 +10,7 @@
         packages.default = pkgs.buildGoModule {
           name = "torrent-ratio";
           src = ./.;
-          vendorHash = "sha256-HH0VHleShuv91QkV1CC8thgBWe5RgoUKhXa706Ked04=";
+          vendorHash = "sha256-4NAwh2sp1SBVniMmx6loFMN/9gbY3kfWnHV/U0TIgHg=";
           buildInputs = [ pkgs.sqlite ];
         };
         devShells.default = pkgs.mkShell {
