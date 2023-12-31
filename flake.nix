@@ -43,13 +43,17 @@
               GOOS = builtins.elemAt (builtins.split "_" gosystem) 0;
               ZIGARCH = { arm64 = "aarch64"; amd64 = "x86_64"; }.${GOARCH};
               ZIGOS = { darwin = "macos"; }.${GOOS} or GOOS;
+              lib = pkgs.lib;
+              tags = lib.optionals (GOOS == "darwin") [ "netgo" ];
+              frameworks = nixpkgs.legacyPackages.aarch64-darwin.darwin.apple_sdk.frameworks;
+              zigExtraArgs = lib.optionalString (GOOS == "darwin") " -F${frameworks.CoreFoundation}/Library/Frameworks -F${frameworks.Security}/Library/Frameworks";
             in
             torrent-ratio.overrideAttrs (old: {
-              inherit GOARCH GOOS;
+              inherit GOARCH GOOS tags;
               nativeBuildInputs = old.nativeBuildInputs ++ [ pkgs.zig ];
               preBuild = (old.preBuild or "") + ''
                 export XDG_CACHE_HOME="$TMPDIR"
-                export CC="zig cc -target ${ZIGARCH}-${ZIGOS}"
+                export CC="zig cc -target ${ZIGARCH}-${ZIGOS}${zigExtraArgs}"
                 export CXX="$CC"
               '';
               postInstall = (old.postInstall or "") + ''
@@ -59,6 +63,8 @@
                   rmdir $out/bin/${gosystem}/
                 fi
               '';
+            } // lib.optionalAttrs (gosystem == "darwin_amd64") {
+              NIX_HARDENING_ENABLE = "pie";
             });
         in
         eachGoSystem mkCrossPackage // {
