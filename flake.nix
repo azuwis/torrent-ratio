@@ -44,12 +44,11 @@
               ZIGARCH = { arm64 = "aarch64"; amd64 = "x86_64"; }.${GOARCH};
               ZIGOS = { darwin = "macos"; }.${GOOS} or GOOS;
               lib = pkgs.lib;
-              tags = lib.optionals (GOOS == "darwin") [ "netgo" ];
-              frameworks = nixpkgs.legacyPackages.aarch64-darwin.darwin.apple_sdk.frameworks;
-              zigExtraArgs = lib.optionalString (GOOS == "darwin") " -F${frameworks.CoreFoundation}/Library/Frameworks -F${frameworks.Security}/Library/Frameworks";
+              zigExtraArgs = with nixpkgs.legacyPackages.aarch64-darwin.darwin.apple_sdk; lib.optionalString (GOOS == "darwin")
+                " -isystem ${Libsystem}/include -F${frameworks.CoreFoundation}/Library/Frameworks -F${frameworks.Security}/Library/Frameworks";
             in
             torrent-ratio.overrideAttrs (old: {
-              inherit GOARCH GOOS tags;
+              inherit GOARCH GOOS;
               nativeBuildInputs = old.nativeBuildInputs ++ [ pkgs.zig ];
               preBuild = (old.preBuild or "") + ''
                 export XDG_CACHE_HOME="$TMPDIR"
