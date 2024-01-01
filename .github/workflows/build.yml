@@ -74,6 +74,15 @@ jobs:
       with:
         name: torrent-ratio-${{ env.gosystem }}
         path: /nix/var/nix/profiles/per-user/runner/${{ matrix.gosystem }}/bin/*
+    - name: Zip
+      if: ${{ startsWith(github.ref, 'refs/tags/') }}
+      run: |
+        gosystem="${{ matrix.gosystem }}"
+        zip -j -r "/tmp/torrent-ratio-${{ env.gosystem }}.zip" "/nix/var/nix/profiles/per-user/$USER/$gosystem"
+    - uses: softprops/action-gh-release@v1
+      if: ${{ startsWith(github.ref, 'refs/tags/') }}
+      with:
+        files: /tmp/*.zip
     - name: Nix GC
       run: |
         # create gcroots for flake inputs to prevent gc
