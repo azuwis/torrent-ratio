@@ -1,0 +1,91 @@
+name: Build
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        description: Enable debug
+        type: boolean
+        required: false
+        default: false
+jobs:
+  build:
+    strategy:
+      matrix:
+        gosystem:
+        - darwin_amd64
+        - darwin_arm64
+        - linux_amd64
+        - linux_arm64
+        - windows_amd64
+        - windows_arm64
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: nixbuild/nix-quick-install-action@v26
+      with:
+        nix_conf: |
+          accept-flake-config = true
+          experimental-features = nix-command flakes
+          keep-derivations = true
+          keep-outputs = true
+    - uses: cachix/cachix-action@v12
+      with:
+        name: azuwis
+        authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+    - name: Pre cache
+      run: |
+        mv -v /nix/store /nix/store.bak
+        mv -v /nix/var/nix/db/db.sqlite /nix/var/nix/db/db.sqlite.bak
+    - name: Get current time
+      run: echo "CACHE_TIMESTAMP=$(date +%s)" >> $GITHUB_ENV
+    - uses: actions/cache/restore@v3
+      with:
+        key: torrent-ratio-${{ matrix.os }}-${{ matrix.gosystem }}-${{ hashFiles('flake.*') }}-${{ env.CACHE_TIMESTAMP }}
+        restore-keys: |
+          torrent-ratio-${{ matrix.os }}-${{ matrix.gosystem }}-${{ hashFiles('flake.*') }}
+        path: |
+          /nix/store
+          /nix/var/nix/db/db.sqlite
+    - name: Post cache
+      run: |
+        if ! nix --version
+        then
+          if [ -e /nix/store ]
+          then
+            # cache hit, but nix changed
+            mv -v /nix/store /nix/var/nix/db/db.sqlite /tmp
+          fi
+          mv -v /nix/store.bak /nix/store
+          mv -v /nix/var/nix/db/db.sqlite.bak /nix/var/nix/db/db.sqlite
+          echo "CACHE_NEED_UPDATE=yes" >> $GITHUB_ENV
+        fi
+    - uses: lhotari/action-upterm@v1
+      if: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_enabled }}
+      with:
+        limit-access-to-actor: true
+    - name: Build
+      run: |
+        gosystem="${{ matrix.gosystem }}"
+        nix --print-build-logs build --out-link "/nix/var/nix/profiles/per-user/$USER/$gosystem" ".#$gosystem"
+        echo "gosystem=${gosystem//_/-}" >> $GITHUB_ENV
+    - uses: actions/upload-artifact@v4
+      with:
+        name: torrent-ratio-${{ env.gosystem }}
+        path: /nix/var/nix/profiles/per-user/runner/${{ matrix.gosystem }}/bin/*
+    - name: Nix GC
+      run: |
+        # create gcroots for flake inputs to prevent gc
+        for archive in $(nix flake archive --json | grep -E -o '/nix/store/[^"]+')
+        do
+          ln -fsnv $archive "/nix/var/nix/profiles/per-user/$USER/$(basename $archive)"
+        done
+        nix-collect-garbage -d
+    - uses: actions/cache/save@v3
+      if: ${{ env.CACHE_NEED_UPDATE == 'yes' }}
+      with:
+        key: torrent-ratio-${{ matrix.os }}-${{ matrix.gosystem }}-${{ hashFiles('flake.*') }}-${{ env.CACHE_TIMESTAMP }}
+        path: |
+          /nix/store
+          /nix/var/nix/db/db.sqlite

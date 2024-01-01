@@ -30,8 +30,9 @@
                 ./.
                 (unions [
                   (maybeMissing ./result)
-                  ./flake.nix
+                  ./.github
                   ./flake.lock
+                  ./flake.nix
                 ]);
             };
             vendorHash = "sha256-4NAwh2sp1SBVniMmx6loFMN/9gbY3kfWnHV/U0TIgHg=";
