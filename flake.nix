@@ -63,6 +63,7 @@
                 fi
               '';
             } // lib.optionalAttrs (gosystem == "darwin_amd64") {
+              # https://github.com/ziglang/zig/issues/15438
               NIX_HARDENING_ENABLE = "pie";
             });
         in
