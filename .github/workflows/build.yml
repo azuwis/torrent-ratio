@@ -87,7 +87,7 @@ jobs:
         # create gcroots for flake inputs to prevent gc
         for archive in $(nix flake archive --json | grep -E -o '/nix/store/[^"]+')
         do
-          ln -fsnv $archive "/nix/var/nix/profiles/per-user/$USER/$(basename $archive)"
+          nix build --out-link "/tmp/$(basename $archive)" "$archive"
         done
         nix-collect-garbage -d
     - uses: actions/cache/save@v3
