@@ -68,17 +68,16 @@ jobs:
     - name: Build
       run: |
         gosystem="${{ matrix.gosystem }}"
-        nix --print-build-logs build --out-link "/nix/var/nix/profiles/per-user/$USER/$gosystem" ".#$gosystem"
-        echo "gosystem=${gosystem//_/-}" >> $GITHUB_ENV
+        nix -L build ".#$gosystem"
+        echo "GOSYSTEM=${gosystem//_/-}" >> $GITHUB_ENV
     - uses: actions/upload-artifact@v4
       with:
-        name: torrent-ratio-${{ env.gosystem }}
-        path: /nix/var/nix/profiles/per-user/runner/${{ matrix.gosystem }}/bin/*
+        name: torrent-ratio-${{ env.GOSYSTEM }}
+        path: ./result/bin/*
     - name: Zip
       if: ${{ startsWith(github.ref, 'refs/tags/') }}
       run: |
-        gosystem="${{ matrix.gosystem }}"
-        zip -j -r "/tmp/torrent-ratio-${{ env.gosystem }}.zip" "/nix/var/nix/profiles/per-user/$USER/$gosystem"
+        zip -j -r "/tmp/torrent-ratio-${{ env.GOSYSTEM }}.zip" ./result
     - uses: softprops/action-gh-release@v1
       if: ${{ startsWith(github.ref, 'refs/tags/') }}
       with:
