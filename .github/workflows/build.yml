@@ -16,8 +16,6 @@ on:
         default: false
 jobs:
   build:
-    permissions:
-      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -50,12 +48,21 @@ jobs:
       with:
         name: torrent-ratio-${{ env.GOSYSTEM }}
         path: ./result/bin/*
-    - name: Zip
-      if: ${{ startsWith(github.ref, 'refs/tags/') }}
-      run: |
-        zip -j -r "/tmp/torrent-ratio-$GOSYSTEM.zip" ./result
-    - uses: softprops/action-gh-release@v1
-      if: ${{ startsWith(github.ref, 'refs/tags/') }}
-      with:
-        files: /tmp/*.zip
     - uses: azuwis/nix-action@post
+  release:
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+    needs: build
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/download-artifact@v4
+    - name: Zip
+      run: |
+        for dir in torrent-ratio-*
+        do
+          zip -r "$dir" "$dir"
+        done
+    - uses: softprops/action-gh-release@v1
+      with:
+        files: ./*.zip
