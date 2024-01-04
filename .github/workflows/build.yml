@@ -30,7 +30,7 @@ jobs:
     - uses: azuwis/nix-action@main
       with:
         key: torrent-ratio-${{ matrix.gosystem }}-${{ hashFiles('flake.*') }}
-        debug: ${{ inputs.debug }}
+        debug: ${{ github.event_name == 'workflow_dispatch' && inputs.debug }}
         credential: ${{ secrets.TTYD_CREDENTIAL }}
     - uses: cachix/cachix-action@v12
       with:
