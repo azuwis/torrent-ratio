@@ -41,10 +41,11 @@ jobs:
         name: azuwis
         authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
     - name: Build
+      env:
+        GOSYSTEM: ${{ matrix.gosystem }}
       run: |
-        gosystem="${{ matrix.gosystem }}"
-        nix -L build ".#$gosystem"
-        echo "GOSYSTEM=${gosystem//_/-}" >> $GITHUB_ENV
+        nix -L build ".#$GOSYSTEM"
+        echo "GOSYSTEM=${GOSYSTEM//_/-}" >> $GITHUB_ENV
     - uses: actions/upload-artifact@v4
       with:
         name: torrent-ratio-${{ env.GOSYSTEM }}
@@ -52,7 +53,7 @@ jobs:
     - name: Zip
       if: ${{ startsWith(github.ref, 'refs/tags/') }}
       run: |
-        zip -j -r "/tmp/torrent-ratio-${{ env.GOSYSTEM }}.zip" ./result
+        zip -j -r "/tmp/torrent-ratio-$GOSYSTEM.zip" ./result
     - uses: softprops/action-gh-release@v1
       if: ${{ startsWith(github.ref, 'refs/tags/') }}
       with:
