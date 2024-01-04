@@ -1,4 +1,5 @@
 name: Build
+permissions: {}
 on:
   pull_request:
     paths-ignore:
@@ -15,6 +16,8 @@ on:
         default: false
 jobs:
   build:
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
