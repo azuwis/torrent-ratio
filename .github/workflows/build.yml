@@ -28,11 +28,17 @@ jobs:
         - windows_arm64
     runs-on: ubuntu-latest
     steps:
+    - name: Skip run if debug enabled and job not matched
+      if: >-
+        ${{ github.event_name == 'workflow_dispatch' && inputs.debug && !
+            matrix.gosystem == 'darwin_amd64'
+        }}
+      run: exit 1
     - uses: actions/checkout@v4
     - uses: azuwis/nix-action@main
       with:
         key: torrent-ratio-${{ matrix.gosystem }}-${{ hashFiles('flake.*') }}
-        debug: ${{ github.event_name == 'workflow_dispatch' && inputs.debug && matrix.gosystem == 'darwin_amd64' }}
+        debug: ${{ github.event_name == 'workflow_dispatch' && inputs.debug }}
         credential: ${{ secrets.TTYD_CREDENTIAL }}
     - uses: cachix/cachix-action@v12
       with:
