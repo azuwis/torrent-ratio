@@ -61,13 +61,7 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/download-artifact@v4
-    - name: Zip
-      run: |
-        for dir in torrent-ratio-*
-        do
-          zip -r "$dir" "$dir"
-        done
+    - uses: azuwis/actions/download@main
     - uses: softprops/action-gh-release@v1
       with:
-        files: ./*.zip
+        files: '*.zip'
