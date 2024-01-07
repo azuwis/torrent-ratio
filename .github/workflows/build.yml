@@ -35,11 +35,10 @@ jobs:
         }}
       run: exit 1
     - uses: actions/checkout@v4
-    - uses: azuwis/nix-action@main
+    - uses: azuwis/actions/nix@main
       with:
         key: torrent-ratio-${{ matrix.gosystem }}-${{ hashFiles('flake.*') }}
         debug: ${{ github.event_name == 'workflow_dispatch' && inputs.debug }}
-        credential: ${{ secrets.TTYD_CREDENTIAL }}
     - uses: cachix/cachix-action@v12
       with:
         name: azuwis
@@ -54,7 +53,7 @@ jobs:
       with:
         name: torrent-ratio-${{ env.GOSYSTEM }}
         path: ./result/bin/*
-    - uses: azuwis/nix-action@post
+    - uses: azuwis/actions/nix/post@main
   release:
     if: ${{ startsWith(github.ref, 'refs/tags/') }}
     needs: build
