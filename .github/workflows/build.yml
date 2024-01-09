@@ -62,6 +62,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: azuwis/actions/download@main
-    - uses: softprops/action-gh-release@v1
+    - uses: azuwis/actions/release@main
       with:
         files: '*.zip'
