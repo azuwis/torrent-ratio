@@ -1,5 +1,5 @@
 {
-  inputs.nixpkgs.url = "nixpkgs";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
 
   outputs =
     { nixpkgs, ... }:
@@ -24,7 +24,8 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
-          torrent-ratio = pkgs.buildGoModule {
+          # go 1.22 + zig 0.11 gives `cgo error: unsupported linker arg: -x`
+          torrent-ratio = pkgs.buildGo121Module {
             name = "torrent-ratio";
             src =
               with pkgs.lib.fileset;
@@ -69,7 +70,9 @@
               old:
               {
                 inherit GOARCH GOOS;
-                nativeBuildInputs = old.nativeBuildInputs ++ [ pkgs.zig ];
+                # https://github.com/ziglang/zig/issues/20689
+                # error: unable to create compilation: AccessDenied
+                nativeBuildInputs = old.nativeBuildInputs ++ [ pkgs.zig_0_11 ];
                 preBuild =
                   (old.preBuild or "")
                   + ''
