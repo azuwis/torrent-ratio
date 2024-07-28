@@ -2,7 +2,7 @@
   inputs.nixpkgs.url = "nixpkgs";
 
   outputs =
-    { self, nixpkgs }:
+    { nixpkgs, ... }:
     let
       eachSystem = nixpkgs.lib.genAttrs [
         "aarch64-darwin"
@@ -57,9 +57,13 @@
               ZIGOS = { darwin = "macos"; }.${GOOS} or GOOS;
               lib = pkgs.lib;
               zigExtraArgs =
-                with nixpkgs.legacyPackages.aarch64-darwin.darwin.apple_sdk;
+                let
+                  inherit (nixpkgs.legacyPackages.aarch64-darwin.darwin) apple_sdk;
+                  inherit (apple_sdk) Libsystem;
+                  inherit (apple_sdk.frameworks) CoreFoundation Security;
+                in
                 lib.optionalString (GOOS == "darwin")
-                  " -isystem ${Libsystem}/include -F${frameworks.CoreFoundation}/Library/Frameworks -F${frameworks.Security}/Library/Frameworks";
+                  " -isystem ${Libsystem}/include -F${CoreFoundation}/Library/Frameworks -F${Security}/Library/Frameworks";
             in
             torrent-ratio.overrideAttrs (
               old:
