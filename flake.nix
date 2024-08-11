@@ -123,14 +123,8 @@
           update = {
             type = "app";
             program = builtins.toString (
-              let
-                oldHash = self.packages.${system}.default.goModules.outputHash;
-                goModules = "(builtins.getFlake (toString ./.)).packages.${system}.default.goModules";
-              in
               pkgs.writers.writeBash "update" ''
-                newHash=$(${pkgs.nix-prefetch}/bin/nix-prefetch --option extra-experimental-features flakes "{ sha256 }: ${goModules}.overrideAttrs (_: { outputHash = sha256; })")
-                mapfile -d "" < flake.nix
-                printf "%s" "''${MAPFILE/"${oldHash}"/"$newHash"}" > flake.nix
+                ${pkgs.nix-update}/bin/nix-update -F default --version=skip --override-filename flake.nix
               ''
             );
           };
