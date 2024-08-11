@@ -2,7 +2,7 @@
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
 
   outputs =
-    { nixpkgs, ... }:
+    { self, nixpkgs, ... }:
     let
       eachSystem = nixpkgs.lib.genAttrs [
         "aarch64-darwin"
@@ -110,6 +110,29 @@
               go
               sqlite
             ];
+          };
+        }
+      );
+
+      apps = eachSystem (
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+        in
+        {
+          update = {
+            type = "app";
+            program = builtins.toString (
+              let
+                oldHash = self.packages.${system}.default.goModules.outputHash;
+                goModules = "(builtins.getFlake (toString ./.)).packages.${system}.default.goModules";
+              in
+              pkgs.writers.writeBash "update" ''
+                newHash=$(${pkgs.nix-prefetch}/bin/nix-prefetch --option extra-experimental-features flakes "{ sha256 }: ${goModules}.overrideAttrs (_: { outputHash = sha256; })")
+                mapfile -d "" < flake.nix
+                printf "%s" "''${MAPFILE/"${oldHash}"/"$newHash"}" > flake.nix
+              ''
+            );
           };
         }
       );
