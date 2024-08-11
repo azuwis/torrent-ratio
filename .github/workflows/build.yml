@@ -43,6 +43,11 @@ jobs:
       with:
         name: azuwis
         authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+    - name: Update vendorHash if in dependabot branches
+      if: ${{ startsWith(github.head_ref, 'dependabot/') }}
+      run: |
+        nix run .#update
+        git diff
     - name: Build
       env:
         GOSYSTEM: ${{ matrix.gosystem }}
