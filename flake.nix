@@ -38,7 +38,7 @@
                   ./flake.nix
                 ]);
               };
-            vendorHash = "sha256-4NAwh2sp1SBVniMmx6loFMN/9gbY3kfWnHV/U0TIgHg=";
+            vendorHash = "sha256-EENo9w5tsdfBhEuti7HeXx7okrOKFsYn9IylBM+8n50=";
             ldflags = [
               "-s"
               "-w"
