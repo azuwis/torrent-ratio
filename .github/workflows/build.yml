@@ -9,6 +9,8 @@ on:
     - dependabot/**
     paths-ignore:
     - '**.md'
+    - go.mod
+    - go.sum
   workflow_dispatch:
     inputs:
       debug:
