@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/abourget/goproxy v0.0.0-20170220221050-fcf497103e7b
 	github.com/kr/pretty v0.3.1
-	github.com/mattn/go-sqlite3 v1.14.23
+	github.com/mattn/go-sqlite3 v1.14.24
 	golang.org/x/crypto v0.27.0
 	gopkg.in/yaml.v2 v2.4.0
 )
