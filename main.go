@@ -50,6 +50,7 @@ type Setting struct {
 	Speed       int64
 	Port        int64
 	PeerId      string
+	UserAgent   string
 }
 
 // ReqInfo ...
@@ -193,6 +194,7 @@ func loadConfig(file string) map[string]Setting {
 			Speed:       51200,
 			Port:        0,
 			PeerId:      "",
+			UserAgent:   "",
 		},
 	}
 	yamlFile, err := ioutil.ReadFile(file)
@@ -463,6 +465,9 @@ func main() {
 		if setting.Port > 0 && setting.Port < 65536 {
 			req.URL.RawQuery = portMatcher.ReplaceAllString(req.URL.RawQuery,
 				fmt.Sprintf("${1}port=%d${2}", setting.Port))
+		}
+		if setting.UserAgent != "" {
+			req.Header.Set("User-Agent", setting.UserAgent)
 		}
 		reqInfo.Epoch = time.Now().Unix()
 		// initial value to save

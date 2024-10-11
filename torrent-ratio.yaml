@@ -7,6 +7,7 @@ default: &default
   speed: 51200
   port: 0
   peerid: ""
+  useragent: ""
 
 high: &high
   <<: *default
