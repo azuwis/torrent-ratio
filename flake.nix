@@ -24,26 +24,7 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
-          # go 1.22 + zig 0.11 gives `cgo error: unsupported linker arg: -x`
-          torrent-ratio = pkgs.buildGo121Module {
-            name = "torrent-ratio";
-            src =
-              with pkgs.lib.fileset;
-              toSource {
-                root = ./.;
-                fileset = difference ./. (unions [
-                  (maybeMissing ./result)
-                  ./.github
-                  ./flake.lock
-                  ./flake.nix
-                ]);
-              };
-            vendorHash = "sha256-yDaALsAg+j9gQOTx4kdeCDE85talRsbbXzo/btdryYc=";
-            ldflags = [
-              "-s"
-              "-w"
-            ];
-          };
+          torrent-ratio = pkgs.callPackage ./torrent-ratio.nix { };
           mkCrossPackage =
             gosystem:
             let
@@ -124,7 +105,7 @@
             type = "app";
             program = builtins.toString (
               pkgs.writers.writeBash "update" ''
-                ${pkgs.nix-update}/bin/nix-update -F default --version=skip --override-filename flake.nix
+                ${pkgs.nix-update}/bin/nix-update -F default --version=skip --override-filename torrent-ratio.nix
               ''
             );
           };
