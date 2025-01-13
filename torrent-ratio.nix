@@ -7,12 +7,13 @@ buildGo121Module {
     with lib.fileset;
     toSource {
       root = ./.;
-      fileset = difference ./. (unions [
-        (maybeMissing ./result)
-        ./.github
-        ./flake.lock
-        ./flake.nix
-      ]);
+      fileset = unions [
+        ./go.mod
+        ./go.sum
+        ./main.go
+        ./static
+        ./templates
+      ];
     };
   vendorHash = "sha256-yDaALsAg+j9gQOTx4kdeCDE85talRsbbXzo/btdryYc=";
   ldflags = [
