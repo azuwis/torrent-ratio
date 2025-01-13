@@ -1,16 +1,28 @@
 {
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
+  inputs.devshell.url = "github:numtide/devshell";
+  inputs.devshell.inputs.nixpkgs.follows = "nixpkgs";
 
   outputs =
-    { self, nixpkgs, ... }:
+    inputs@{ ... }:
     let
-      eachSystem = nixpkgs.lib.genAttrs [
+      systems = [
         "aarch64-darwin"
         "aarch64-linux"
         "x86_64-darwin"
         "x86_64-linux"
       ];
-      eachGoSystem = nixpkgs.lib.genAttrs [
+      eachSystem =
+        f:
+        inputs.nixpkgs.lib.genAttrs systems (
+          system:
+          f rec {
+            inherit system;
+            pkgs = inputs.nixpkgs.legacyPackages.${system};
+            devshell = import inputs.devshell { nixpkgs = pkgs; };
+          }
+        );
+      eachGoSystem = inputs.nixpkgs.lib.genAttrs [
         "darwin_amd64"
         "darwin_arm64"
         "linux_amd64"
@@ -21,9 +33,8 @@
     in
     {
       packages = eachSystem (
-        system:
+        { pkgs, ... }:
         let
-          pkgs = nixpkgs.legacyPackages.${system};
           torrent-ratio = pkgs.callPackage ./torrent-ratio.nix { };
           mkCrossPackage =
             gosystem:
@@ -40,7 +51,7 @@
               lib = pkgs.lib;
               zigExtraArgs =
                 let
-                  inherit (nixpkgs.legacyPackages.aarch64-darwin.darwin) apple_sdk;
+                  inherit (inputs.nixpkgs.legacyPackages.aarch64-darwin.darwin) apple_sdk;
                   inherit (apple_sdk) Libsystem;
                   inherit (apple_sdk.frameworks) CoreFoundation Security;
                 in
@@ -81,13 +92,10 @@
       );
 
       devShells = eachSystem (
-        system:
-        let
-          pkgs = nixpkgs.legacyPackages.${system};
-        in
+        { pkgs, devshell, ... }:
         {
-          default = pkgs.mkShell {
-            buildInputs = with pkgs; [
+          default = devshell.mkShell {
+            packages = with pkgs; [
               go_1_21
               sqlite
             ];
@@ -96,10 +104,7 @@
       );
 
       apps = eachSystem (
-        system:
-        let
-          pkgs = nixpkgs.legacyPackages.${system};
-        in
+        { pkgs, ... }:
         {
           update = {
             type = "app";
