@@ -39,6 +39,8 @@ jobs:
         }}
       run: exit 1
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
     - uses: azuwis/actions/nix@main
       with:
         key: nix-${{ matrix.gosystem }}
@@ -47,11 +49,16 @@ jobs:
       with:
         name: azuwis
         authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-    - name: Update vendorHash if in dependabot branches
-      if: ${{ startsWith(github.head_ref, 'dependabot/') }}
+    - name: Update vendorHash if needed
+      env:
+        GITHUB_EVENT_BEFORE: ${{ github.event.before }}
       run: |
-        nix run .#update
-        git diff
+        if [[ "$GITHUB_HEAD_REF" == dependabot/* ]] || \
+           [ "$GITHUB_EVENT_BEFORE" == "0000000000000000000000000000000000000000" ] || \
+           git diff --name-only "${GITHUB_EVENT_BEFORE}..${GITHUB_SHA}" | grep -Fqx go.sum; then
+          nix run .#update
+          git diff
+        fi
     - name: Build
       env:
         GOSYSTEM: ${{ matrix.gosystem }}
