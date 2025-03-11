@@ -18,33 +18,41 @@ on:
         type: boolean
         required: false
         default: false
+      gosystem:
+        description: Go system
+        type: choice
+        options: 
+          - darwin_amd64
+          - darwin_arm64
+          - linux_amd64
+          - linux_arm64
+          - windows_amd64
+          - windows_arm64
+        default: linux_amd64
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
-        gosystem:
-        - darwin_amd64
-        - darwin_arm64
-        - linux_amd64
-        - linux_arm64
-        - windows_amd64
-        - windows_arm64
+        gosystem: >-
+          ${{ fromJSON(
+            inputs.gosystem == 'darwin_amd64' && '["darwin_amd64"]' || (
+            inputs.gosystem == 'darwin_arm64' && '["darwin_arm64"]' || (
+            inputs.gosystem == 'linux_amd64' && '["linux_amd64"]' || (
+            inputs.gosystem == 'linux_arm64' && '["linux_arm64"]' || (
+            inputs.gosystem == 'windows_amd64' && '["windows_amd64"]' || (
+            inputs.gosystem == 'windows_arm64' && '["windows_arm64"]' || (
+            '["darwin_amd64", "darwin_arm64", "linux_amd64", "linux_arm64", "windows_amd64", "windows_arm64"]'
+          ))))))) }}
     runs-on: ubuntu-latest
     steps:
-    - name: Skip debug
-      if: >-
-        ${{ github.event_name == 'workflow_dispatch' && inputs.debug && !
-            (matrix.gosystem == 'darwin_amd64')
-        }}
-      run: exit 1
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
     - uses: azuwis/actions/nix@main
       with:
         key: nix-${{ matrix.gosystem }}
-        debug: ${{ github.event_name == 'workflow_dispatch' && inputs.debug }}
+        debug: ${{ inputs.debug }}
     - uses: cachix/cachix-action@v15
       with:
         name: azuwis
