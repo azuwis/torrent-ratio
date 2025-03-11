@@ -1,8 +1,6 @@
 {
-  lib,
-  apple_sdk,
   torrent-ratio,
-  zig_0_11,
+  zig,
 }:
 gosystem:
 
@@ -16,41 +14,30 @@ let
     }
     .${GOARCH};
   ZIGOS = { darwin = "macos"; }.${GOOS} or GOOS;
-  zigExtraArgs =
-    let
-      inherit (apple_sdk) Libsystem;
-      inherit (apple_sdk.frameworks) CoreFoundation Security;
-    in
-    lib.optionalString (GOOS == "darwin")
-      " -isystem ${Libsystem}/include -F${CoreFoundation}/Library/Frameworks -F${Security}/Library/Frameworks";
 in
 
-torrent-ratio.overrideAttrs (
-  old:
-  {
+torrent-ratio.overrideAttrs (old: {
+  env = {
     inherit GOARCH GOOS;
-    # https://github.com/ziglang/zig/issues/20689
-    # error: unable to create compilation: AccessDenied
-    nativeBuildInputs = old.nativeBuildInputs ++ [ zig_0_11 ];
-    preBuild =
-      (old.preBuild or "")
-      + ''
-        export XDG_CACHE_HOME="$TMPDIR"
-        export CC="zig cc -target ${ZIGARCH}-${ZIGOS}${zigExtraArgs}"
-        export CXX="$CC"
-      '';
-    postInstall =
-      (old.postInstall or "")
-      + ''
-        if [ -d $out/bin/${gosystem} ]
-        then
-          mv $out/bin/${gosystem}/* $out/bin
-          rmdir $out/bin/${gosystem}/
-        fi
-      '';
-  }
-  // lib.optionalAttrs (gosystem == "darwin_amd64") {
-    # https://github.com/ziglang/zig/issues/15438
-    NIX_HARDENING_ENABLE = "pie";
-  }
-)
+    # When building .#darwin_arm64 with `CGO_ENABLED=1`, error: unable to find dynamic system library 'resolv'
+    CGO_ENABLED = 0;
+  };
+  nativeBuildInputs = old.nativeBuildInputs ++ [
+    zig
+  ];
+  preBuild =
+    (old.preBuild or "")
+    + ''
+      export CC="zig cc -target ${ZIGARCH}-${ZIGOS}"
+      export CXX="$CC"
+    '';
+  postInstall =
+    (old.postInstall or "")
+    + ''
+      if [ -d $out/bin/${gosystem} ]
+      then
+        mv $out/bin/${gosystem}/* $out/bin
+        rmdir $out/bin/${gosystem}/
+      fi
+    '';
+})

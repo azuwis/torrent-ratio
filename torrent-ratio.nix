@@ -1,7 +1,6 @@
-{ lib, buildGo121Module }:
+{ lib, buildGoModule }:
 
-# go 1.22 + zig 0.11 gives `cgo error: unsupported linker arg: -x`
-buildGo121Module {
+buildGoModule {
   name = "torrent-ratio";
   src =
     with lib.fileset;

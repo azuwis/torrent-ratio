@@ -1,5 +1,5 @@
 {
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
   inputs.devshell.url = "github:numtide/devshell";
   inputs.devshell.inputs.nixpkgs.follows = "nixpkgs";
 
@@ -38,7 +38,6 @@
           torrent-ratio = pkgs.callPackage ./torrent-ratio.nix { };
           mkCrossPackage = pkgs.callPackage ./cross.nix {
             inherit torrent-ratio;
-            inherit (inputs.nixpkgs.legacyPackages.aarch64-darwin.darwin) apple_sdk;
           };
         in
         eachGoSystem mkCrossPackage // { default = torrent-ratio; }
@@ -49,7 +48,7 @@
         {
           default = devshell.mkShell {
             packages = with pkgs; [
-              go_1_21
+              go
               sqlite
             ];
           };
