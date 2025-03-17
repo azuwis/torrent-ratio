@@ -53,7 +53,7 @@ jobs:
       with:
         key: nix-${{ matrix.gosystem }}
         debug: ${{ inputs.debug }}
-    - uses: cachix/cachix-action@v15
+    - uses: cachix/cachix-action@v16
       with:
         name: azuwis
         authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
