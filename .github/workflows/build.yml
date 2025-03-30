@@ -46,14 +46,14 @@ jobs:
           ))))))) }}
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       with:
         fetch-depth: 0
     - uses: azuwis/actions/nix@main
       with:
         key: nix-${{ matrix.gosystem }}
         debug: ${{ inputs.debug }}
-    - uses: cachix/cachix-action@v15
+    - uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # v16
       with:
         name: azuwis
         authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -73,7 +73,7 @@ jobs:
       run: |
         nix -L build ".#$GOSYSTEM"
         echo "GOSYSTEM=${GOSYSTEM//_/-}" >> $GITHUB_ENV
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         name: torrent-ratio-${{ env.GOSYSTEM }}
         path: ./result/bin/*
