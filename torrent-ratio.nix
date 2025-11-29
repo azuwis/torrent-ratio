@@ -1,7 +1,8 @@
 { lib, buildGoModule }:
 
 buildGoModule {
-  name = "torrent-ratio";
+  pname = "torrent-ratio";
+  version = "0.8";
   src =
     with lib.fileset;
     toSource {
