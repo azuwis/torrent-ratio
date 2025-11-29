@@ -1,6 +1,6 @@
 { lib, buildGoModule }:
 
-buildGoModule {
+buildGoModule (finalAttrs: {
   pname = "torrent-ratio";
   version = "0.8";
   src =
@@ -17,7 +17,8 @@ buildGoModule {
     };
   vendorHash = "sha256-RH38kK6r357K9YgjgyHxd9iSlBK7i1MgwETN9NNeVU4=";
   ldflags = [
+    "-X main.Version=v${finalAttrs.version}"
     "-s"
     "-w"
   ];
-}
+})
