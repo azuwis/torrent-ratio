@@ -19,5 +19,5 @@ torrent-ratio
   "windows_arm64"
 ] mkCrossPackage
 // {
-  default = torrent-ratio;
+  inherit torrent-ratio;
 }

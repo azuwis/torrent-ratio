@@ -15,7 +15,7 @@ devshell.mkShell {
   commands = [
     {
       name = "update";
-      command = "nix-update default --version=skip";
+      command = "nix-update torrent-ratio --version=skip";
     }
   ];
 }
