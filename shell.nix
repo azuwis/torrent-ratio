@@ -9,6 +9,13 @@ in
 devshell.mkShell {
   packages = with pkgs; [
     go
+    nix-update
     sqlite
+  ];
+  commands = [
+    {
+      name = "update";
+      command = "nix-update default --version=skip";
+    }
   ];
 }

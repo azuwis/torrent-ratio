@@ -19,7 +19,4 @@ pkgs.lib.genAttrs [
 ] mkCrossPackage
 // {
   default = torrent-ratio;
-  update = pkgs.writeShellScriptBin "update" ''
-    ${pkgs.nix-update}/bin/nix-update default --version=skip
-  '';
 }
