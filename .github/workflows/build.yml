@@ -68,7 +68,7 @@ jobs:
         if [[ "$GITHUB_HEAD_REF" == dependabot/* ]] || \
            [ "$GITHUB_EVENT_BEFORE" == "0000000000000000000000000000000000000000" ] || \
            git diff --name-only "${GITHUB_EVENT_BEFORE}..${GITHUB_SHA}" | grep -Fqx go.sum; then
-          nix run .#update
+          nix run -f . update
           git diff
           if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF_NAME" = "master" ] && \
            [ "$GOSYSTEM" = "linux_amd64" ] &&  git diff --name-only | grep -Fqx torrent-ratio.nix; then
@@ -82,7 +82,7 @@ jobs:
       env:
         GOSYSTEM: ${{ matrix.gosystem }}
       run: |
-        nix -L build ".#$GOSYSTEM"
+        nix-build -A "$GOSYSTEM"
         echo "GOSYSTEM=${GOSYSTEM//_/-}" >> $GITHUB_ENV
     - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
       with:
