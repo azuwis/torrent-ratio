@@ -9,7 +9,8 @@ let
   };
 in
 
-pkgs.lib.genAttrs [
+torrent-ratio
+// pkgs.lib.genAttrs [
   "darwin_amd64"
   "darwin_arm64"
   "linux_amd64"
