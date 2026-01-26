@@ -83,7 +83,7 @@ jobs:
         GOSYSTEM: ${{ matrix.gosystem }}
       run: |
         nix-build -A "$GOSYSTEM"
-        echo "GOSYSTEM=${GOSYSTEM//_/-}" >> $GITHUB_ENV
+        echo "GOSYSTEM=${GOSYSTEM//_/-}" >> "$GITHUB_ENV"
     - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: torrent-ratio-${{ env.GOSYSTEM }}
