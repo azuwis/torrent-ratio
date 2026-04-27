@@ -13,7 +13,6 @@ import (
 	"gopkg.in/yaml.v2"
 	"html/template"
 	"io"
-	"io/ioutil"
 	"log"
 	"math"
 	"math/rand"
@@ -197,7 +196,7 @@ func loadConfig(file string) map[string]Setting {
 			UserAgent:   "",
 		},
 	}
-	yamlFile, err := ioutil.ReadFile(file)
+	yamlFile, err := os.ReadFile(file)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			log.Print(err)
@@ -528,10 +527,10 @@ func main() {
 	proxy.HandleResponseFunc(func(ctx *goproxy.ProxyCtx) goproxy.Next {
 		resp := ctx.Resp
 		if resp != nil && resp.StatusCode == http.StatusOK {
-			if bodyBytes, err := ioutil.ReadAll(resp.Body); err != nil {
+			if bodyBytes, err := io.ReadAll(resp.Body); err != nil {
 				ctx.Warnf("%s", err)
 			} else {
-				resp.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+				resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 				if match := incompleteMatcher.FindSubmatch(bodyBytes); match != nil {
 					query := ctx.Req.URL.Query()
 					infoHash := query.Get("info_hash")
