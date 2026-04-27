@@ -374,7 +374,6 @@ func main() {
 	}
 
 	loadCA()
-	rand.Seed(time.Now().UnixNano())
 
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.HandleConnect(goproxy.AlwaysMitm)
