@@ -347,7 +347,7 @@ func format(num int64) string {
 	return fmt.Sprintf("%3.1f%s", float, "T")
 }
 
-func ago(epoch int64) int64 {
+func minutesAgo(epoch int64) int64 {
 	return (time.Now().Unix() - epoch) / 60
 }
 
@@ -390,7 +390,7 @@ func main() {
 
 	templates, err := template.New("").Funcs(template.FuncMap{
 		"format": format,
-		"ago":    ago,
+		"minutesAgo": minutesAgo,
 	}).ParseFS(embedFS, "templates/*")
 	if err != nil {
 		log.Fatal(err)

@@ -28,7 +28,7 @@
           <td>{{ .ReportUploaded | format }}</td>
           <td>{{ .Uploaded | format }}</td>
           <td>{{ .Downloaded | format }}</td>
-          <td>{{ .Epoch | ago }}</td>
+          <td>{{ .Epoch | minutesAgo }}</td>
           <td>{{ .Incomplete }}</td>
           <td>{{ .Host }}</td>
         </tr>
