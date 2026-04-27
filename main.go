@@ -311,7 +311,7 @@ func loadAllReqInfo(db *sql.DB) ([]ReqInfo, error) {
 		}
 		result = append(result, reqInfo)
 	}
-	return result, err
+	return result, rows.Err()
 }
 
 func cleanup(db *sql.DB) {
