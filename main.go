@@ -69,7 +69,13 @@ var (
 	portMatcher       = regexp.MustCompile(`(^|&)port=\d+(&|$)`)
 	uploadedMatcher   = regexp.MustCompile(`(^|&)uploaded=\d+(&|$)`)
 	// Version info
-	Version = "Git"
+	Version           = "Git"
+)
+
+const (
+	incompleteUnknown = -2    // sentinel for no previous info in DB
+	maxDeltaSeconds   = 10800 // 3 hours, skip if announce interval exceeds this
+	cleanupThreshold  = 86400 // 1 day in seconds
 )
 
 func loadCA() {
@@ -317,7 +323,7 @@ func loadAllReqInfo(db *sql.DB) ([]ReqInfo, error) {
 func cleanup(db *sql.DB) {
 	sql := `DELETE FROM torrent WHERE Epoch < ?`
 	for {
-		result, err := db.Exec(sql, time.Now().Unix()-86400)
+		result, err := db.Exec(sql, time.Now().Unix()-cleanupThreshold)
 		if err != nil {
 			log.Print(err)
 		}
@@ -473,7 +479,7 @@ func main() {
 		// initial value to save
 		reqInfo.ReportUploaded = reqInfo.Uploaded
 		// -2 means no previous info
-		reqInfo.Incomplete = int64(-2)
+		reqInfo.Incomplete = incompleteUnknown
 		init := ""
 		if prevReqInfo, err := loadReqInfo(db, reqInfo.InfoHash); err != nil {
 			// info not exists from DB
@@ -490,7 +496,7 @@ func main() {
 				deltaUploaded := reqInfo.Uploaded - prevReqInfo.Uploaded
 				deltaDownloaded := reqInfo.Downloaded - prevReqInfo.Downloaded
 				deltaEpoch := reqInfo.Epoch - prevReqInfo.Epoch
-				if deltaUploaded >= 0 && deltaDownloaded >= 0 && deltaEpoch <= 10800 {
+				if deltaUploaded >= 0 && deltaDownloaded >= 0 && deltaEpoch <= maxDeltaSeconds {
 					// make sure the info from DB is new
 					reqInfo.ReportUploaded = prevReqInfo.ReportUploaded
 					reqInfo.ReportUploaded += deltaUploaded
