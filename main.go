@@ -430,11 +430,13 @@ func main() {
 
 	proxy.Transport.Dial = func(network, addr string) (c net.Conn, err error) {
 		tcpaddr, err := net.ResolveTCPAddr(network, addr)
-		if err == nil && !tcpaddr.IP.IsPrivate() {
-			return net.Dial(network, tcpaddr.String())
-		} else {
-			return
+		if err != nil {
+			return nil, err
 		}
+		if tcpaddr.IP.IsPrivate() {
+			return nil, fmt.Errorf("private IP blocked: %s", tcpaddr.IP)
+		}
+		return net.Dial(network, tcpaddr.String())
 	}
 
 	proxy.HandleRequestFunc(func(ctx *goproxy.ProxyCtx) goproxy.Next {
