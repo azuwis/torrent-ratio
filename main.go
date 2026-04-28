@@ -504,7 +504,7 @@ func main() {
 			return nil, err
 		}
 		if tcpaddr.IP.IsPrivate() {
-			return nil, fmt.Errorf("private IP blocked: %s", tcpaddr.IP)
+			return nil, fmt.Errorf("Request blocked: %s", tcpaddr.IP)
 		}
 		var d net.Dialer
 		return d.DialContext(ctx, network, tcpaddr.String())
@@ -521,13 +521,13 @@ func main() {
 			}
 			reqInfo.Host = sni
 		}
-		if reqInfo.Host == "127.0.0.1" || !strings.Contains(strings.Trim(reqInfo.Host, "."), ".") {
+		if ip := net.ParseIP(reqInfo.Host); ip != nil && ip.IsLoopback() || !strings.Contains(strings.Trim(reqInfo.Host, "."), ".") {
 			return nil, &http.Response{
 				StatusCode: http.StatusBadGateway,
 				Proto:      "HTTP/1.1",
 				ProtoMajor: 1,
 				ProtoMinor: 1,
-				Body:       io.NopCloser(strings.NewReader("Rejected by proxy")),
+				Body:       io.NopCloser(strings.NewReader("Request blocked: " + reqInfo.Host)),
 				Request:    req,
 				Header:     make(http.Header),
 			}

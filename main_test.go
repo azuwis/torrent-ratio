@@ -527,13 +527,13 @@ func setupProxy(t *testing.T) *proxyTestEnv {
 			}
 			reqInfo.Host = sni
 		}
-		if reqInfo.Host == "127.0.0.1" || !strings.Contains(strings.Trim(reqInfo.Host, "."), ".") {
+		if ip := net.ParseIP(reqInfo.Host); ip != nil && ip.IsLoopback() || !strings.Contains(strings.Trim(reqInfo.Host, "."), ".") {
 			return nil, &http.Response{
 				StatusCode: http.StatusBadGateway,
 				Proto:      "HTTP/1.1",
 				ProtoMajor: 1,
 				ProtoMinor: 1,
-				Body:       io.NopCloser(strings.NewReader("Rejected by proxy")),
+				Body:       io.NopCloser(strings.NewReader("Request blocked: " + reqInfo.Host)),
 				Request:    req,
 				Header:     make(http.Header),
 			}
@@ -870,7 +870,7 @@ func makeDialGuard() func(ctx context.Context, network, addr string) (net.Conn, 
 			return nil, err
 		}
 		if tcpaddr.IP.IsPrivate() {
-			return nil, fmt.Errorf("private IP blocked: %s", tcpaddr.IP)
+			return nil, fmt.Errorf("Request blocked: %s", tcpaddr.IP)
 		}
 		var d net.Dialer
 		return d.DialContext(ctx, network, tcpaddr.String())
@@ -891,8 +891,8 @@ func TestDialGuardBlocksPrivate(t *testing.T) {
 		_, err := guard(context.Background(), "tcp", addr)
 		if err == nil {
 			t.Errorf("expected error for private IP %s", addr)
-		} else if !strings.Contains(err.Error(), "private IP blocked") {
-			t.Errorf("expected 'private IP blocked' error for %s, got: %v", addr, err)
+		} else if !strings.Contains(err.Error(), "Request blocked") {
+			t.Errorf("expected 'Request blocked' error for %s, got: %v", addr, err)
 		}
 	}
 }
@@ -900,12 +900,12 @@ func TestDialGuardBlocksPrivate(t *testing.T) {
 func TestDialGuardAllowsPublic(t *testing.T) {
 	guard := makeDialGuard()
 	// 8.8.8.8 is a public IP — the guard should resolve it and attempt to connect
-	// (connection will likely timeout/fail, but should NOT be the "private IP blocked" error)
+	// (connection will likely timeout/fail, but should NOT be the "Request blocked" error)
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 	_, err := guard(ctx, "tcp", "8.8.8.8:80")
 	if err != nil {
-		if strings.Contains(err.Error(), "private IP blocked") {
+		if strings.Contains(err.Error(), "Request blocked") {
 			t.Errorf("public IP unexpectedly blocked: %v", err)
 		}
 	}
