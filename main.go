@@ -3,8 +3,12 @@ package main
 import (
 	"bytes"
 	"context"
+	crand "crypto/rand"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"database/sql"
 	"embed"
 	"flag"
@@ -18,6 +22,7 @@ import (
 	"io"
 	"log"
 	"math"
+	"math/big"
 	"math/rand"
 	"net"
 	"net/http"
@@ -175,6 +180,33 @@ cj/azKBaT04IOMLaN8xfSqitJYSraWMVNgGJM5vfcVaivZnNh0lZBv+qu6YkdM88
 	if goproxy.GoproxyCa.Leaf, err = x509.ParseCertificate(goproxy.GoproxyCa.Certificate[0]); err != nil {
 		log.Print(err)
 	}
+}
+
+// signCert generates an ephemeral TLS certificate signed by ca for host.
+func signCert(ca *tls.Certificate, host string) (*tls.Certificate, error) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), crand.Reader)
+	if err != nil {
+		return nil, err
+	}
+	serial, err := crand.Int(crand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		return nil, err
+	}
+	template := &x509.Certificate{
+		SerialNumber: serial,
+		Subject:      pkix.Name{CommonName: host},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(365 * 24 * time.Hour),
+		DNSNames:     []string{host},
+	}
+	der, err := x509.CreateCertificate(crand.Reader, template, ca.Leaf, &key.PublicKey, ca.PrivateKey)
+	if err != nil {
+		return nil, err
+	}
+	return &tls.Certificate{
+		Certificate: [][]byte{der, ca.Certificate[0]},
+		PrivateKey:  key,
+	}, nil
 }
 
 func parseArg() Arg {
@@ -390,7 +422,31 @@ func main() {
 	loadCA()
 
 	proxy := goproxy.NewProxyHttpServer()
-	proxy.OnRequest().HandleConnect(goproxy.AlwaysMitm)
+	proxy.OnRequest().HandleConnectFunc(func(host string, ctx *goproxy.ProxyCtx) (*goproxy.ConnectAction, string) {
+		h, _, err := net.SplitHostPort(host)
+		if err != nil {
+			h = host
+		}
+		if net.ParseIP(h) != nil {
+			return &goproxy.ConnectAction{
+				Action: goproxy.ConnectMitm,
+				TLSConfig: func(host string, ctx *goproxy.ProxyCtx) (*tls.Config, error) {
+					return &tls.Config{
+						InsecureSkipVerify: true,
+						GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+							name := hello.ServerName
+							if name == "" {
+								name = h
+							}
+							ctx.UserData = name
+							return signCert(&goproxy.GoproxyCa, name)
+						},
+					}, nil
+				},
+			}, host
+		}
+		return goproxy.MitmConnect, host
+	})
 
 	if !isTerminal {
 		proxy.Logger = log.New(os.Stderr, "", 0)
@@ -457,6 +513,14 @@ func main() {
 	proxy.OnRequest().DoFunc(func(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
 		var reqInfo ReqInfo
 		reqInfo.Host = req.URL.Hostname()
+		if sni, ok := ctx.UserData.(string); ok && net.ParseIP(reqInfo.Host) != nil {
+			if port := req.URL.Port(); port != "" {
+				req.URL.Host = net.JoinHostPort(sni, port)
+			} else {
+				req.URL.Host = sni
+			}
+			reqInfo.Host = sni
+		}
 		if reqInfo.Host == "127.0.0.1" || !strings.Contains(strings.Trim(reqInfo.Host, "."), ".") {
 			return nil, &http.Response{
 				StatusCode: http.StatusBadGateway,
