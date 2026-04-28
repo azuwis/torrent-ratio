@@ -18,7 +18,7 @@ nix-shell                         # enter dev shell (or use direnv)
 
 ## Architecture
 
-The entire application is a single-file Go program (`main.go`, ~560 lines) — a MITM proxy that intercepts BitTorrent tracker announce requests and inflates the `uploaded` query parameter to improve the client's reported ratio.
+The entire application is a single-file Go program (`main.go`, ~630 lines) — a MITM proxy that intercepts BitTorrent tracker announce requests and inflates the `uploaded` query parameter to improve the client's reported ratio. Uses [`elazarl/goproxy`](https://github.com/elazarl/goproxy) for the proxy core (switched from `abourget/goproxy`; the SNI sniffing from that fork was replaced with `tls.Config.GetCertificate`).
 
 ### Key types (all in `main.go`)
 
@@ -28,12 +28,13 @@ The entire application is a single-file Go program (`main.go`, ~560 lines) — a
 
 ### Flow
 
-1. **Startup**: Parse flags → open SQLite DB → load YAML config → load MITM CA cert
-2. **Request interception** (`HandleRequestFunc`): Extract `info_hash`/`uploaded`/`downloaded` from announce query params → look up host in config → optionally override peer_id/port/User-Agent → compute inflated `uploaded` value based on deltas and config → replace param → forward to real tracker
-3. **Response interception** (`HandleResponseFunc`): Parse tracker response for `incomplete` (leecher count) → store in DB for future calculations
-4. **Web UI**: Serve embedded `templates/` and `static/` at `/` (HTML for browsers, plain text for CLI tools) — displays a sortable table of all tracked torrents
-5. **Cleanup goroutine**: Deletes entries older than `cleanupThreshold` (86400s = 1 day)
-6. **Dial guard**: Custom `Transport.Dial` rejects connections to private IPs
+1. **Startup**: Parse flags → open SQLite DB → load YAML config → load MITM CA cert (overrides `goproxy.GoproxyCa` directly with `tls.X509KeyPair`)
+2. **CONNECT handler** (`HandleConnectFunc`): MITM all CONNECT tunnels. When the target is an IP (client resolved DNS locally), uses `tls.Config.GetCertificate` to capture the TLS SNI from the ClientHello, generates an ephemeral cert via `signCert()`, and stores the SNI hostname in `ctx.UserData` for inner requests.
+3. **Request interception** (`OnRequest().DoFunc`): Extract `info_hash`/`uploaded`/`downloaded` from announce query params → if `UserData` contains an SNI hostname, fix up `req.URL.Host` for correct upstream routing → look up host in config → optionally override peer_id/port/User-Agent → compute inflated `uploaded` value based on deltas and config → replace param → forward to real tracker
+4. **Response interception** (`OnResponse().DoFunc`): Parse tracker response for `incomplete` (leecher count) → store in DB for future calculations
+5. **Web UI**: Serve embedded `templates/` and `static/` at `/` (HTML for browsers, plain text for CLI tools) — displays a sortable table of all tracked torrents
+6. **Cleanup goroutine**: Deletes entries older than `cleanupThreshold` (86400s = 1 day)
+7. **Dial guard**: Custom `Tr.DialContext` rejects connections to private IPs
 
 ### Key constants
 
@@ -51,7 +52,25 @@ YAML with per-tracker-hostname keys containing `Setting` values. A `"default"` k
 
 ### Version
 
-`Version` variable set via `-ldflags -X main.Version=v0.9` in the Nix derivation. Defaults to `"Git"` if not set (e.g., when using `make`).
+`Version` variable set via `-ldflags -X main.Version=v0.10` in the Nix derivation. Defaults to `"Git"` if not set (e.g., when using `make`).
+
+## SNI Handling
+
+libtorrent 2.x resolves DNS locally for HTTP proxy CONNECT, sending raw IPs
+regardless of qBittorrent's "Perform hostname lookup via proxy" checkbox.
+This is because libtorrent's `proxy_hostnames` setting only applies to SOCKS5
+([libtorrent#7710](https://github.com/arvidn/libtorrent/pull/7710) adds a
+separate `proxy_send_host_in_connect` for HTTP, disabled by default).
+
+The proxy handles this via SNI sniffing:
+
+1. **Connect handler** detects IP-based CONNECT and uses `tls.Config.GetCertificate`
+2. **GetCertificate** captures the TLS Server Name Indication from the ClientHello during handshake
+3. The SNI hostname is stored in `ctx.UserData` and propagated to inner request contexts
+4. **Request handler** fixes up `req.URL.Host` to the real hostname for upstream DNS resolution and TLS ServerName
+
+The `signCert()` function generates ephemeral ECDSA P-256 certificates on the fly, signed by
+the proxy's CA.
 
 ## No tests
 
