@@ -503,7 +503,7 @@ func main() {
 		if err != nil {
 			return nil, err
 		}
-		if tcpaddr.IP.IsPrivate() {
+		if tcpaddr.IP.IsLoopback() || tcpaddr.IP.IsPrivate() {
 			return nil, fmt.Errorf("Request blocked: %s", tcpaddr.IP)
 		}
 		var d net.Dialer

@@ -869,7 +869,7 @@ func makeDialGuard() func(ctx context.Context, network, addr string) (net.Conn, 
 		if err != nil {
 			return nil, err
 		}
-		if tcpaddr.IP.IsPrivate() {
+		if tcpaddr.IP.IsLoopback() || tcpaddr.IP.IsPrivate() {
 			return nil, fmt.Errorf("Request blocked: %s", tcpaddr.IP)
 		}
 		var d net.Dialer
@@ -907,6 +907,23 @@ func TestDialGuardAllowsPublic(t *testing.T) {
 	if err != nil {
 		if strings.Contains(err.Error(), "Request blocked") {
 			t.Errorf("public IP unexpectedly blocked: %v", err)
+		}
+	}
+}
+
+func TestDialGuardBlocksLoopback(t *testing.T) {
+	guard := makeDialGuard()
+	loopbackIPs := []string{
+		"127.0.0.1:80",
+		"127.0.0.2:443",
+		"127.255.255.255:8080",
+	}
+	for _, addr := range loopbackIPs {
+		_, err := guard(context.Background(), "tcp", addr)
+		if err == nil {
+			t.Errorf("expected error for loopback IP %s", addr)
+		} else if !strings.Contains(err.Error(), "Request blocked") {
+			t.Errorf("expected 'Request blocked' error for %s, got: %v", addr, err)
 		}
 	}
 }
