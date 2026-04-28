@@ -2,7 +2,7 @@
 
 buildGoModule (finalAttrs: {
   pname = "torrent-ratio";
-  version = "0.10";
+  version = "0.11";
   src =
     with lib.fileset;
     toSource {
