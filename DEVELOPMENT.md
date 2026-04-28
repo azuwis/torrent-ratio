@@ -30,12 +30,12 @@ The entire application is a single-file Go program (`main.go`, ~630 lines) — a
 ### Flow
 
 1. **Startup**: Parse flags → open SQLite DB → load YAML config → load MITM CA cert (overrides `goproxy.GoproxyCa` directly with `tls.X509KeyPair`)
-2. **CONNECT handler** (`HandleConnectFunc`): MITM all CONNECT tunnels. When the target is an IP (client resolved DNS locally), uses `tls.Config.GetCertificate` to capture the TLS SNI from the ClientHello, generates an ephemeral cert via `signCert()`, and stores the SNI hostname in `ctx.UserData` for inner requests.
-3. **Request interception** (`OnRequest().DoFunc`): Extract `info_hash`/`uploaded`/`downloaded` from announce query params → if `UserData` contains an SNI hostname, fix up `req.URL.Host` for correct upstream routing → look up host in config → optionally override peer_id/port/User-Agent → compute inflated `uploaded` value based on deltas and config → replace param → forward to real tracker
+2. **CONNECT handler** (`HandleConnectFunc`): Rejects literal loopback/private IP addresses → MITM all CONNECT tunnels. When the target is an IP (client resolved DNS locally), uses `tls.Config.GetCertificate` to capture the TLS SNI from the ClientHello, generates an ephemeral cert via `signCert()`, and stores the SNI hostname in `ctx.UserData` for inner requests.
+3. **Request interception** (`OnRequest().DoFunc`): Reject non-FQDN, loopback IP, and hosts resolving to loopback/private IPs → extract `info_hash`/`uploaded`/`downloaded` from announce query params → if `UserData` contains an SNI hostname, fix up `req.URL.Host` for correct upstream routing → look up host in config → optionally override peer_id/port/User-Agent → compute inflated `uploaded` value based on deltas and config → replace param → forward to real tracker
 4. **Response interception** (`OnResponse().DoFunc`): Parse tracker response for `incomplete` (leecher count) → store in DB for future calculations
 5. **Web UI**: Serve embedded `templates/` and `static/` at `/` (HTML for browsers, plain text for CLI tools) — displays a sortable table of all tracked torrents
 6. **Cleanup goroutine**: Deletes entries older than `cleanupThreshold` (86400s = 1 day)
-7. **Dial guard**: Custom `Tr.DialContext` rejects connections to private IPs
+7. **Dial guard**: Custom `Tr.DialContext` rejects connections to loopback and private IPs
 
 ### Key constants
 
