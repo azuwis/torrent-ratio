@@ -2,11 +2,14 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"database/sql"
 	"embed"
 	"flag"
 	"fmt"
-	"github.com/abourget/goproxy"
+	"github.com/elazarl/goproxy"
 	"github.com/kr/pretty"
 	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/ssh/terminal"
@@ -164,7 +167,12 @@ pmcjjocD/UCCSuHgbAYNNnO/JdhnSylz1tIg26I+2iLNyeTKIepSNlsBxnkLmqM1
 cj/azKBaT04IOMLaN8xfSqitJYSraWMVNgGJM5vfcVaivZnNh0lZBv+qu6YkdM88
 4/avCJ8IutT+FcMM+GbGazOm5ALWqUyhrnbLGc4CQMPfe7Il6NxwcrOxT8w=
 -----END RSA PRIVATE KEY-----`)
-	if err := goproxy.LoadDefaultConfig(); err != nil {
+	var err error
+	goproxy.GoproxyCa, err = tls.X509KeyPair(goproxy.CA_CERT, goproxy.CA_KEY)
+	if err != nil {
+		log.Print(err)
+	}
+	if goproxy.GoproxyCa.Leaf, err = x509.ParseCertificate(goproxy.GoproxyCa.Certificate[0]); err != nil {
 		log.Print(err)
 	}
 }
@@ -215,8 +223,8 @@ func loadConfig(file string) map[string]Setting {
 	return config
 }
 
-func queryInt64(ctx *goproxy.ProxyCtx, key string) int64 {
-	query := ctx.Req.URL.Query()
+func queryInt64(req *http.Request, ctx *goproxy.ProxyCtx, key string) int64 {
+	query := req.URL.Query()
 	i, err := strconv.ParseInt(query.Get(key), 10, 64)
 	if err != nil {
 		ctx.Warnf("%s", err)
@@ -382,10 +390,10 @@ func main() {
 	loadCA()
 
 	proxy := goproxy.NewProxyHttpServer()
-	proxy.HandleConnect(goproxy.AlwaysMitm)
+	proxy.OnRequest().HandleConnect(goproxy.AlwaysMitm)
 
 	if !isTerminal {
-		proxy.Logger.SetFlags(0)
+		proxy.Logger = log.New(os.Stderr, "", 0)
 	}
 
 	templates, err := template.New("").Funcs(template.FuncMap{
@@ -432,9 +440,9 @@ func main() {
 			http.NotFound(w, r)
 		}
 	})
-	proxy.NonProxyHandler = mux
+	proxy.NonproxyHandler = mux
 
-	proxy.Transport.Dial = func(network, addr string) (c net.Conn, err error) {
+	proxy.Tr.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		tcpaddr, err := net.ResolveTCPAddr(network, addr)
 		if err != nil {
 			return nil, err
@@ -442,22 +450,30 @@ func main() {
 		if tcpaddr.IP.IsPrivate() {
 			return nil, fmt.Errorf("private IP blocked: %s", tcpaddr.IP)
 		}
-		return net.Dial(network, tcpaddr.String())
+		var d net.Dialer
+		return d.DialContext(ctx, network, tcpaddr.String())
 	}
 
-	proxy.HandleRequestFunc(func(ctx *goproxy.ProxyCtx) goproxy.Next {
-		req := ctx.Req
+	proxy.OnRequest().DoFunc(func(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
 		var reqInfo ReqInfo
 		reqInfo.Host = req.URL.Hostname()
 		if reqInfo.Host == "127.0.0.1" || !strings.Contains(strings.Trim(reqInfo.Host, "."), ".") {
-			return goproxy.REJECT
+			return nil, &http.Response{
+				StatusCode: http.StatusBadGateway,
+				Proto:      "HTTP/1.1",
+				ProtoMajor: 1,
+				ProtoMinor: 1,
+				Body:       io.NopCloser(strings.NewReader("Rejected by proxy")),
+				Request:    req,
+				Header:     make(http.Header),
+			}
 		}
 		query := req.URL.Query()
 		reqInfo.InfoHash = query.Get("info_hash")
-		reqInfo.Uploaded = queryInt64(ctx, "uploaded")
-		reqInfo.Downloaded = queryInt64(ctx, "downloaded")
+		reqInfo.Uploaded = queryInt64(req, ctx, "uploaded")
+		reqInfo.Downloaded = queryInt64(req, ctx, "downloaded")
 		if reqInfo.InfoHash == "" || reqInfo.Uploaded < 0 || reqInfo.Downloaded < 0 {
-			return goproxy.NEXT
+			return req, nil
 		}
 		setting := config["default"]
 		if hostSetting, ok := config[reqInfo.Host]; ok {
@@ -528,11 +544,10 @@ func main() {
 			format(reqInfo.Downloaded),
 			reqInfo.Host,
 			reqInfo.Epoch)
-		return goproxy.NEXT
+		return req, nil
 	})
 
-	proxy.HandleResponseFunc(func(ctx *goproxy.ProxyCtx) goproxy.Next {
-		resp := ctx.Resp
+	proxy.OnResponse().DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
 		if resp != nil && resp.StatusCode == http.StatusOK {
 			if bodyBytes, err := io.ReadAll(resp.Body); err != nil {
 				ctx.Warnf("%s", err)
@@ -542,7 +557,7 @@ func main() {
 					query := ctx.Req.URL.Query()
 					infoHash := query.Get("info_hash")
 					incomplete, _ := strconv.ParseInt(string(match[1]), 10, 64)
-					if queryInt64(ctx, "left") > 0 || query.Get("event") == "completed" {
+					if queryInt64(ctx.Req, ctx, "left") > 0 || query.Get("event") == "completed" {
 						// downloading, exclude self from downloaders
 						incomplete--
 					}
@@ -554,10 +569,10 @@ func main() {
 				}
 			}
 		}
-		return goproxy.NEXT
+		return resp
 	})
 
 	go cleanup(db)
 	proxy.Verbose = *arg.Verbose
-	log.Fatal(proxy.ListenAndServe(*arg.Addr))
+	log.Fatal(http.ListenAndServe(*arg.Addr, proxy))
 }
