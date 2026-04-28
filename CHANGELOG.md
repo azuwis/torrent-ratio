@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.11 (2026-04-28)
+
+### Added
+
+- `CHANGELOG.md`.
+
+### Changed
+
+- **Loopback IP blocking** — use `net.ParseIP` and `IsLoopback()` instead of hardcoded `"127.0.0.1"` string comparison. The check now covers all `127.0.0.0/8` and `::1` addresses at the request and CONNECT handler levels.
+
+- **DNS resolution guard** — resolve hostnames in the request handler and block requests to domains that resolve to loopback or private IPs, giving a proper 502 response instead of a dropped connection.
+
+- **Unified rejection messages** — all blocking paths (request handler, CONNECT handler, and DialContext) now return `"Request blocked: <host>"`.
+
+- **DialContext now blocks loopback** — previously only private IPs were blocked at dial time; loopback addresses are now also blocked, catching domains like `localhost.localdomain` that resolve to `127.0.0.1`.
+
+### Fixed
+
+- Fix tests for cross-compilation and `CGO_ENABLED=0`.
+
+### Tests
+
+- Add tests and `make test` target.
+- Update `DEVELOPMENT.md` for tests.
+
+### Nix
+
+- Add missing `gnumake` to `shell.nix`.
+
 ## v0.10 (2026-04-28)
 
 ### Changed
