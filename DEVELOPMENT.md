@@ -5,6 +5,7 @@
 ```bash
 make              # go build with stripped debug info
 make fmt          # go fmt
+make test         # run tests (go test ./... -v -count=1)
 make run          # run locally (127.0.0.1:8089, local config and db)
 make update       # update Go dependencies
 ```
@@ -72,6 +73,15 @@ The proxy handles this via SNI sniffing:
 The `signCert()` function generates ephemeral ECDSA P-256 certificates on the fly, signed by
 the proxy's CA.
 
-## No tests
+## Tests
 
-There are zero test files in this repository. No linting configuration exists beyond `go fmt`.
+Tests use a mock upstream server via `httptest` — no real network access required, so they
+work in the Nix build sandbox. DB-dependent tests are skipped when `CGO_ENABLED=0`
+(cross-compilation), since go-sqlite3 requires CGo.
+
+```bash
+make test           # run all tests
+go test ./... -v    # verbose output
+```
+
+Test file: `main_test.go`.
