@@ -1,4 +1,5 @@
 {
+  stdenv,
   torrent-ratio,
   zig,
 }:
@@ -17,6 +18,7 @@ let
 in
 
 torrent-ratio.overrideAttrs (old: {
+  doCheck = stdenv.buildPlatform.system == "${ZIGARCH}-${GOOS}";
   env = {
     inherit GOARCH GOOS;
     # When building .#darwin_arm64 with `CGO_ENABLED=1`, error: unable to find dynamic system library 'resolv'
@@ -25,19 +27,15 @@ torrent-ratio.overrideAttrs (old: {
   nativeBuildInputs = old.nativeBuildInputs ++ [
     zig
   ];
-  preBuild =
-    (old.preBuild or "")
-    + ''
-      export CC="zig cc -target ${ZIGARCH}-${ZIGOS}"
-      export CXX="$CC"
-    '';
-  postInstall =
-    (old.postInstall or "")
-    + ''
-      if [ -d $out/bin/${gosystem} ]
-      then
-        mv $out/bin/${gosystem}/* $out/bin
-        rmdir $out/bin/${gosystem}/
-      fi
-    '';
+  preBuild = (old.preBuild or "") + ''
+    export CC="zig cc -target ${ZIGARCH}-${ZIGOS}"
+    export CXX="$CC"
+  '';
+  postInstall = (old.postInstall or "") + ''
+    if [ -d $out/bin/${gosystem} ]
+    then
+      mv $out/bin/${gosystem}/* $out/bin
+      rmdir $out/bin/${gosystem}/
+    fi
+  '';
 })

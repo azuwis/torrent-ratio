@@ -147,8 +147,22 @@ func TestLoadConfigInvalid(t *testing.T) {
 
 // --- Database operations ---
 
+// requireCGo skips the test if CGo is disabled (go-sqlite3 needs it).
+func requireCGo(t *testing.T) {
+	t.Helper()
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.Exec("SELECT 1"); err != nil {
+		t.Skip("sqlite3 requires CGo (CGO_ENABLED=0)", err)
+	}
+}
+
 func openTestDB(t *testing.T) *sql.DB {
 	t.Helper()
+	requireCGo(t)
 	db, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatal(err)
@@ -445,6 +459,7 @@ type proxyTestEnv struct {
 // overridden to redirect all outbound TCP connections to the mock upstream.
 func setupProxy(t *testing.T) *proxyTestEnv {
 	t.Helper()
+	requireCGo(t)
 	loadCA()
 
 	db, err := sql.Open("sqlite3", ":memory:")
