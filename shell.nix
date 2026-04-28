@@ -9,6 +9,7 @@ in
 devshell.mkShell {
   packages = with pkgs; [
     gcc
+    gnumake
     go
     nix-update
     sqlite
