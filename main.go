@@ -427,7 +427,10 @@ func main() {
 		if err != nil {
 			h = host
 		}
-		if net.ParseIP(h) != nil {
+		if ip := net.ParseIP(h); ip != nil {
+			if ip.IsLoopback() || ip.IsPrivate() {
+				return goproxy.RejectConnect, host
+			}
 			return &goproxy.ConnectAction{
 				Action: goproxy.ConnectMitm,
 				TLSConfig: func(host string, ctx *goproxy.ProxyCtx) (*tls.Config, error) {
@@ -530,6 +533,21 @@ func main() {
 				Body:       io.NopCloser(strings.NewReader("Request blocked: " + reqInfo.Host)),
 				Request:    req,
 				Header:     make(http.Header),
+			}
+		}
+		if ips, err := net.LookupIP(reqInfo.Host); err == nil {
+			for _, ip := range ips {
+				if ip.IsLoopback() || ip.IsPrivate() {
+					return nil, &http.Response{
+						StatusCode: http.StatusBadGateway,
+						Proto:      "HTTP/1.1",
+						ProtoMajor: 1,
+						ProtoMinor: 1,
+						Body:       io.NopCloser(strings.NewReader("Request blocked: " + reqInfo.Host)),
+						Request:    req,
+						Header:     make(http.Header),
+					}
+				}
 			}
 		}
 		query := req.URL.Query()

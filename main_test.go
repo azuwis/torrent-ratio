@@ -538,6 +538,21 @@ func setupProxy(t *testing.T) *proxyTestEnv {
 				Header:     make(http.Header),
 			}
 		}
+		if ips, err := net.LookupIP(reqInfo.Host); err == nil {
+			for _, ip := range ips {
+				if ip.IsLoopback() || ip.IsPrivate() {
+					return nil, &http.Response{
+						StatusCode: http.StatusBadGateway,
+						Proto:      "HTTP/1.1",
+						ProtoMajor: 1,
+						ProtoMinor: 1,
+						Body:       io.NopCloser(strings.NewReader("Request blocked: " + reqInfo.Host)),
+						Request:    req,
+						Header:     make(http.Header),
+					}
+				}
+			}
+		}
 		query := req.URL.Query()
 		reqInfo.InfoHash = query.Get("info_hash")
 		reqInfo.Uploaded = queryInt64(req, ctx, "uploaded")
