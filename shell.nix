@@ -8,6 +8,7 @@ in
 
 devshell.mkShell {
   packages = with pkgs; [
+    gcc
     go
     nix-update
     sqlite
