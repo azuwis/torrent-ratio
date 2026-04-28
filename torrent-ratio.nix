@@ -11,6 +11,7 @@ buildGoModule (finalAttrs: {
         ./go.mod
         ./go.sum
         ./main.go
+        ./main_test.go
         ./static
         ./templates
       ];
