@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -9,15 +8,12 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
-	"math"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -483,17 +479,7 @@ func setupProxy(t *testing.T) *proxyTestEnv {
 	t.Cleanup(func() { env.upstream.Close() })
 
 	config := map[string]Setting{
-		"default": {
-			Uploaded:    [2]float64{0.1, 0.6},
-			Downloaded:  [2]float64{0, 0.07},
-			PercentMin:  0.2,
-			PercentMax:  0.5,
-			PercentStep: 0.02,
-			Speed:       51200,
-			Port:        0,
-			PeerId:      "",
-			UserAgent:   "",
-		},
+		"default": defaultSettings,
 		"tracker.override.com": {
 			Uploaded:    [2]float64{0.5, 1.0},
 			Downloaded:  [2]float64{0.1, 0.2},
@@ -516,118 +502,9 @@ func setupProxy(t *testing.T) *proxyTestEnv {
 		return d.DialContext(ctx, network, env.upstream.Listener.Addr().String())
 	}
 
-	proxy.OnRequest().DoFunc(func(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
-		var reqInfo ReqInfo
-		reqInfo.Host = req.URL.Hostname()
-		if sni, ok := ctx.UserData.(string); ok && net.ParseIP(reqInfo.Host) != nil {
-			if port := req.URL.Port(); port != "" {
-				req.URL.Host = net.JoinHostPort(sni, port)
-			} else {
-				req.URL.Host = sni
-			}
-			reqInfo.Host = sni
-		}
-		if ip := net.ParseIP(reqInfo.Host); ip != nil && ip.IsLoopback() || !strings.Contains(strings.Trim(reqInfo.Host, "."), ".") {
-			return nil, &http.Response{
-				StatusCode: http.StatusBadGateway,
-				Proto:      "HTTP/1.1",
-				ProtoMajor: 1,
-				ProtoMinor: 1,
-				Body:       io.NopCloser(strings.NewReader("Request blocked: " + reqInfo.Host)),
-				Request:    req,
-				Header:     make(http.Header),
-			}
-		}
-		if ips, err := net.LookupIP(reqInfo.Host); err == nil {
-			for _, ip := range ips {
-				if ip.IsLoopback() || ip.IsPrivate() {
-					return nil, &http.Response{
-						StatusCode: http.StatusBadGateway,
-						Proto:      "HTTP/1.1",
-						ProtoMajor: 1,
-						ProtoMinor: 1,
-						Body:       io.NopCloser(strings.NewReader("Request blocked: " + reqInfo.Host)),
-						Request:    req,
-						Header:     make(http.Header),
-					}
-				}
-			}
-		}
-		query := req.URL.Query()
-		reqInfo.InfoHash = query.Get("info_hash")
-		reqInfo.Uploaded = queryInt64(req, ctx, "uploaded")
-		reqInfo.Downloaded = queryInt64(req, ctx, "downloaded")
-		if reqInfo.InfoHash == "" || reqInfo.Uploaded < 0 || reqInfo.Downloaded < 0 {
-			return req, nil
-		}
-		setting := config["default"]
-		if hostSetting, ok := config[reqInfo.Host]; ok {
-			setting = hostSetting
-		}
-		if setting.PeerId != "" {
-			req.URL.RawQuery = peerIdMatcher.ReplaceAllString(req.URL.RawQuery,
-				fmt.Sprintf("${1}peer_id=-%s-", setting.PeerId))
-		}
-		if setting.Port > 0 && setting.Port < 65536 {
-			req.URL.RawQuery = portMatcher.ReplaceAllString(req.URL.RawQuery,
-				fmt.Sprintf("${1}port=%d${2}", setting.Port))
-		}
-		if setting.UserAgent != "" {
-			req.Header.Set("User-Agent", setting.UserAgent)
-		}
-		reqInfo.Epoch = time.Now().Unix()
-		reqInfo.ReportUploaded = reqInfo.Uploaded
-		reqInfo.Incomplete = incompleteUnknown
-		if prevReqInfo, err := loadReqInfo(db, reqInfo.InfoHash); err != nil {
-			// not in DB
-		} else {
-			if query.Get("event") != "started" {
-				deltaUploaded := reqInfo.Uploaded - prevReqInfo.Uploaded
-				deltaDownloaded := reqInfo.Downloaded - prevReqInfo.Downloaded
-				deltaEpoch := reqInfo.Epoch - prevReqInfo.Epoch
-				if deltaUploaded >= 0 && deltaDownloaded >= 0 && deltaEpoch <= maxDeltaSeconds {
-					reqInfo.ReportUploaded = prevReqInfo.ReportUploaded
-					reqInfo.ReportUploaded += deltaUploaded
-					if prevReqInfo.Incomplete >= 1 {
-						reqInfo.ReportUploaded += int64(float64(deltaUploaded) * randRange(setting.Uploaded))
-						reqInfo.ReportUploaded += int64(float64(deltaDownloaded) * randRange(setting.Downloaded))
-						percent := math.Min(setting.PercentMin+float64(prevReqInfo.Incomplete-1)*setting.PercentStep, setting.PercentMax)
-						if rand.Float64() < percent {
-							reqInfo.ReportUploaded += int64(float64(deltaEpoch*setting.Speed) * rand.Float64())
-						}
-					}
-					req.URL.RawQuery = uploadedMatcher.ReplaceAllString(req.URL.RawQuery,
-						fmt.Sprintf("${1}uploaded=%d${2}", reqInfo.ReportUploaded))
-				}
-			}
-		}
-		if err := saveReqInfo(db, reqInfo); err != nil {
-			ctx.Warnf("%s", err)
-		}
-		return req, nil
-	})
+	proxy.OnRequest().DoFunc(makeRequestHandler(db, config))
 
-	proxy.OnResponse().DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
-		if resp != nil && resp.StatusCode == http.StatusOK {
-			if bodyBytes, err := io.ReadAll(resp.Body); err != nil {
-				ctx.Warnf("%s", err)
-			} else {
-				resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-				if match := incompleteMatcher.FindSubmatch(bodyBytes); match != nil {
-					query := ctx.Req.URL.Query()
-					infoHash := query.Get("info_hash")
-					incomplete, _ := strconv.ParseInt(string(match[1]), 10, 64)
-					if queryInt64(ctx.Req, ctx, "left") > 0 || query.Get("event") == "completed" {
-						incomplete--
-					}
-					if err := saveIncomplete(db, infoHash, incomplete); err != nil {
-						ctx.Warnf("%s", err)
-					}
-				}
-			}
-		}
-		return resp
-	})
+	proxy.OnResponse().DoFunc(makeResponseHandler(db))
 
 	env.proxy = httptest.NewServer(proxy)
 	t.Cleanup(func() { env.proxy.Close() })
@@ -876,21 +753,6 @@ func TestUploadedMatcher(t *testing.T) {
 }
 
 // --- Dial guard ---
-
-// makeDialGuard returns the same DialContext function used in main.go.
-func makeDialGuard() func(ctx context.Context, network, addr string) (net.Conn, error) {
-	return func(ctx context.Context, network, addr string) (net.Conn, error) {
-		tcpaddr, err := net.ResolveTCPAddr(network, addr)
-		if err != nil {
-			return nil, err
-		}
-		if tcpaddr.IP.IsLoopback() || tcpaddr.IP.IsPrivate() {
-			return nil, fmt.Errorf("Request blocked: %s", tcpaddr.IP)
-		}
-		var d net.Dialer
-		return d.DialContext(ctx, network, tcpaddr.String())
-	}
-}
 
 func TestDialGuardBlocksPrivate(t *testing.T) {
 	guard := makeDialGuard()

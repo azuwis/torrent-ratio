@@ -76,8 +76,19 @@ var (
 	peerIdMatcher     = regexp.MustCompile(`(^|&)peer_id=-[A-Za-z0-9]{6}-`)
 	portMatcher       = regexp.MustCompile(`(^|&)port=\d+(&|$)`)
 	uploadedMatcher   = regexp.MustCompile(`(^|&)uploaded=\d+(&|$)`)
+	defaultSettings   = Setting{
+		Uploaded:    [2]float64{0.1, 0.6},
+		Downloaded:  [2]float64{0, 0.07},
+		PercentMin:  0.2,
+		PercentMax:  0.5,
+		PercentStep: 0.02,
+		Speed:       51200,
+		Port:        0,
+		PeerId:      "",
+		UserAgent:   "",
+	}
 	// Version info
-	Version           = "Git"
+	Version = "Git"
 )
 
 const (
@@ -230,17 +241,7 @@ func parseArg() Arg {
 
 func loadConfig(file string) map[string]Setting {
 	config := map[string]Setting{
-		"default": {
-			Uploaded:    [2]float64{0.1, 0.6},
-			Downloaded:  [2]float64{0, 0.07},
-			PercentMin:  0.2,
-			PercentMax:  0.5,
-			PercentStep: 0.02,
-			Speed:       51200,
-			Port:        0,
-			PeerId:      "",
-			UserAgent:   "",
-		},
+		"default": defaultSettings,
 	}
 	yamlFile, err := os.ReadFile(file)
 	if err != nil {
@@ -391,117 +392,8 @@ func minutesAgo(epoch int64) int64 {
 	return (time.Now().Unix() - epoch) / 60
 }
 
-func main() {
-	isTerminal := terminal.IsTerminal(int(os.Stdout.Fd()))
-	if !isTerminal {
-		log.SetFlags(0)
-	}
-
-	arg := parseArg()
-
-	if *arg.Version {
-		log.SetFlags(0)
-		log.Fatal(Version)
-	}
-
-	db, err := sql.Open("sqlite3", *arg.DbPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	if err := initDB(db); err != nil {
-		log.Fatal(err)
-	}
-
-	config := loadConfig(*arg.Conf)
-	if *arg.Verbose {
-		log.Printf("CONFIG: %# v", pretty.Formatter(config))
-	}
-
-	loadCA()
-
-	proxy := goproxy.NewProxyHttpServer()
-	proxy.OnRequest().HandleConnectFunc(func(host string, ctx *goproxy.ProxyCtx) (*goproxy.ConnectAction, string) {
-		h, _, err := net.SplitHostPort(host)
-		if err != nil {
-			h = host
-		}
-		if ip := net.ParseIP(h); ip != nil {
-			if ip.IsLoopback() || ip.IsPrivate() {
-				return goproxy.RejectConnect, host
-			}
-			return &goproxy.ConnectAction{
-				Action: goproxy.ConnectMitm,
-				TLSConfig: func(host string, ctx *goproxy.ProxyCtx) (*tls.Config, error) {
-					return &tls.Config{
-						InsecureSkipVerify: true,
-						GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-							name := hello.ServerName
-							if name == "" {
-								name = h
-							}
-							ctx.UserData = name
-							return signCert(&goproxy.GoproxyCa, name)
-						},
-					}, nil
-				},
-			}, host
-		}
-		return goproxy.MitmConnect, host
-	})
-
-	if !isTerminal {
-		proxy.Logger = log.New(os.Stderr, "", 0)
-	}
-
-	templates, err := template.New("").Funcs(template.FuncMap{
-		"format": format,
-		"minutesAgo": minutesAgo,
-	}).ParseFS(embedFS, "templates/*")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	lastModified := time.Now()
-	mux := http.NewServeMux()
-	mux.HandleFunc("/static/", func(w http.ResponseWriter, r *http.Request) {
-		name := strings.TrimPrefix(r.URL.Path, "/")
-		file, err := embedFS.Open(name)
-		if err != nil {
-			http.NotFound(w, r)
-		} else {
-			defer file.Close()
-			http.ServeContent(w, r, name, lastModified, file.(io.ReadSeeker))
-		}
-	})
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		name := r.URL.Path
-		if strings.HasSuffix(name, "/") {
-			if strings.HasPrefix(r.UserAgent(), "Mozilla/") {
-				name += "index.html"
-			} else {
-				name += "index.txt"
-			}
-		}
-		name = strings.TrimPrefix(name, "/")
-		if t := templates.Lookup(name); t != nil {
-			if reqInfos, err := loadAllReqInfo(db); err != nil {
-				log.Print(err)
-				http.Error(w, err.Error(), 500)
-			} else {
-				if err := t.Execute(w, reqInfos); err != nil {
-					log.Print(err)
-					http.Error(w, err.Error(), 500)
-				}
-			}
-		} else {
-			http.NotFound(w, r)
-		}
-	})
-	proxy.NonproxyHandler = mux
-
-	proxy.Tr.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+func makeDialGuard() func(ctx context.Context, network, addr string) (net.Conn, error) {
+	return func(ctx context.Context, network, addr string) (net.Conn, error) {
 		tcpaddr, err := net.ResolveTCPAddr(network, addr)
 		if err != nil {
 			return nil, err
@@ -512,8 +404,10 @@ func main() {
 		var d net.Dialer
 		return d.DialContext(ctx, network, tcpaddr.String())
 	}
+}
 
-	proxy.OnRequest().DoFunc(func(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
+func makeRequestHandler(db *sql.DB, config map[string]Setting) func(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
+	return func(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
 		var reqInfo ReqInfo
 		reqInfo.Host = req.URL.Hostname()
 		if sni, ok := ctx.UserData.(string); ok && net.ParseIP(reqInfo.Host) != nil {
@@ -627,9 +521,11 @@ func main() {
 			reqInfo.Host,
 			reqInfo.Epoch)
 		return req, nil
-	})
+	}
+}
 
-	proxy.OnResponse().DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
+func makeResponseHandler(db *sql.DB) func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
+	return func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
 		if resp != nil && resp.StatusCode == http.StatusOK {
 			if bodyBytes, err := io.ReadAll(resp.Body); err != nil {
 				ctx.Warnf("%s", err)
@@ -652,7 +548,124 @@ func main() {
 			}
 		}
 		return resp
+	}
+}
+
+func main() {
+	isTerminal := terminal.IsTerminal(int(os.Stdout.Fd()))
+	if !isTerminal {
+		log.SetFlags(0)
+	}
+
+	arg := parseArg()
+
+	if *arg.Version {
+		log.SetFlags(0)
+		log.Fatal(Version)
+	}
+
+	db, err := sql.Open("sqlite3", *arg.DbPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	if err := initDB(db); err != nil {
+		log.Fatal(err)
+	}
+
+	config := loadConfig(*arg.Conf)
+	if *arg.Verbose {
+		log.Printf("CONFIG: %# v", pretty.Formatter(config))
+	}
+
+	loadCA()
+
+	proxy := goproxy.NewProxyHttpServer()
+	proxy.OnRequest().HandleConnectFunc(func(host string, ctx *goproxy.ProxyCtx) (*goproxy.ConnectAction, string) {
+		h, _, err := net.SplitHostPort(host)
+		if err != nil {
+			h = host
+		}
+		if ip := net.ParseIP(h); ip != nil {
+			if ip.IsLoopback() || ip.IsPrivate() {
+				return goproxy.RejectConnect, host
+			}
+			return &goproxy.ConnectAction{
+				Action: goproxy.ConnectMitm,
+				TLSConfig: func(host string, ctx *goproxy.ProxyCtx) (*tls.Config, error) {
+					return &tls.Config{
+						InsecureSkipVerify: true,
+						GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+							name := hello.ServerName
+							if name == "" {
+								name = h
+							}
+							ctx.UserData = name
+							return signCert(&goproxy.GoproxyCa, name)
+						},
+					}, nil
+				},
+			}, host
+		}
+		return goproxy.MitmConnect, host
 	})
+
+	if !isTerminal {
+		proxy.Logger = log.New(os.Stderr, "", 0)
+	}
+
+	templates, err := template.New("").Funcs(template.FuncMap{
+		"format": format,
+		"minutesAgo": minutesAgo,
+	}).ParseFS(embedFS, "templates/*")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	lastModified := time.Now()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/static/", func(w http.ResponseWriter, r *http.Request) {
+		name := strings.TrimPrefix(r.URL.Path, "/")
+		file, err := embedFS.Open(name)
+		if err != nil {
+			http.NotFound(w, r)
+		} else {
+			defer file.Close()
+			http.ServeContent(w, r, name, lastModified, file.(io.ReadSeeker))
+		}
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		name := r.URL.Path
+		if strings.HasSuffix(name, "/") {
+			if strings.HasPrefix(r.UserAgent(), "Mozilla/") {
+				name += "index.html"
+			} else {
+				name += "index.txt"
+			}
+		}
+		name = strings.TrimPrefix(name, "/")
+		if t := templates.Lookup(name); t != nil {
+			if reqInfos, err := loadAllReqInfo(db); err != nil {
+				log.Print(err)
+				http.Error(w, err.Error(), 500)
+			} else {
+				if err := t.Execute(w, reqInfos); err != nil {
+					log.Print(err)
+					http.Error(w, err.Error(), 500)
+				}
+			}
+		} else {
+			http.NotFound(w, r)
+		}
+	})
+	proxy.NonproxyHandler = mux
+
+	proxy.Tr.DialContext = makeDialGuard()
+
+	proxy.OnRequest().DoFunc(makeRequestHandler(db, config))
+
+	proxy.OnResponse().DoFunc(makeResponseHandler(db))
 
 	go cleanup(db)
 	proxy.Verbose = *arg.Verbose
