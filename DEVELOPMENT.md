@@ -19,7 +19,7 @@ nix-shell                         # enter dev shell (or use direnv)
 
 ## Architecture
 
-The entire application is a single-file Go program (`main.go`, ~630 lines) — a MITM proxy that intercepts BitTorrent tracker announce requests and inflates the `uploaded` query parameter to improve the client's reported ratio. Uses [`elazarl/goproxy`](https://github.com/elazarl/goproxy) for the proxy core (switched from `abourget/goproxy`; the SNI sniffing from that fork was replaced with `tls.Config.GetCertificate`).
+The entire application is a single-file Go program (`main.go`, ~810 lines) — a MITM proxy that intercepts BitTorrent tracker announce requests and inflates the `uploaded` query parameter to improve the client's reported ratio. Uses [`elazarl/goproxy`](https://github.com/elazarl/goproxy) for the proxy core (switched from `abourget/goproxy`; the SNI sniffing from that fork was replaced with `tls.Config.GetCertificate`).
 
 ### Key types (all in `main.go`)
 
@@ -31,11 +31,11 @@ The entire application is a single-file Go program (`main.go`, ~630 lines) — a
 
 1. **Startup**: Parse flags → open SQLite DB → load YAML config → load MITM CA cert (overrides `goproxy.GoproxyCa` directly with `tls.X509KeyPair`)
 2. **CONNECT handler** (`HandleConnectFunc`): Rejects literal loopback/private IP addresses → MITM all CONNECT tunnels. When the target is an IP (client resolved DNS locally), uses `tls.Config.GetCertificate` to capture the TLS SNI from the ClientHello, generates an ephemeral cert via `signCert()`, and stores the SNI hostname in `ctx.UserData` for inner requests.
-3. **Request interception** (`OnRequest().DoFunc`): Reject non-FQDN, loopback IP, and hosts resolving to loopback/private IPs → extract `info_hash`/`uploaded`/`downloaded` from announce query params → if `UserData` contains an SNI hostname, fix up `req.URL.Host` for correct upstream routing → look up host in config → optionally override peer_id/port/User-Agent → compute inflated `uploaded` value based on deltas and config → replace param → forward to real tracker
-4. **Response interception** (`OnResponse().DoFunc`): Parse tracker response for `incomplete` (leecher count) → store in DB for future calculations
+3. **Request interception** (`makeRequestHandler` → `OnRequest().DoFunc`): Reject non-FQDN, loopback IP, and hosts resolving to loopback/private IPs → extract `info_hash`/`uploaded`/`downloaded` from announce query params → if `UserData` contains an SNI hostname, fix up `req.URL.Host` for correct upstream routing → look up host in config → optionally override peer_id/port/User-Agent → compute inflated `uploaded` value based on deltas and config → replace param → forward to real tracker
+4. **Response interception** (`makeResponseHandler` → `OnResponse().DoFunc`): Parse tracker response for `incomplete` (leecher count) → store in DB for future calculations
 5. **Web UI**: Serve embedded `templates/` and `static/` at `/` (HTML for browsers, plain text for CLI tools) — displays a sortable table of all tracked torrents
 6. **Cleanup goroutine**: Deletes entries older than `cleanupThreshold` (86400s = 1 day)
-7. **Dial guard**: Custom `Tr.DialContext` rejects connections to loopback and private IPs
+7. **Dial guard**: `makeDialGuard()` → `Tr.DialContext` rejects connections to loopback and private IPs
 
 ### Key constants
 
@@ -78,6 +78,9 @@ the proxy's CA.
 Tests use a mock upstream server via `httptest` — no real network access required, so they
 work in the Nix build sandbox. DB-dependent tests are skipped when `CGO_ENABLED=0`
 (cross-compilation), since go-sqlite3 requires CGo.
+
+`setupProxy()` reuses the production handler factories (`makeRequestHandler`, `makeResponseHandler`,
+`makeDialGuard`) and `defaultSettings` to avoid code duplication.
 
 ```bash
 make test           # run all tests
