@@ -19,7 +19,7 @@ in
 
 torrent-ratio.overrideAttrs (old: {
   doCheck = stdenv.buildPlatform.system == "${ZIGARCH}-${GOOS}";
-  env = {
+  env = (old.env or {}) // {
     inherit GOARCH GOOS;
     # When building .#darwin_arm64 with `CGO_ENABLED=1`, error: unable to find dynamic system library 'resolv'
     CGO_ENABLED = 0;
