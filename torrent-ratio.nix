@@ -16,7 +16,7 @@ buildGoModule (finalAttrs: {
         ./templates
       ];
     };
-  vendorHash = "sha256-8GLItU2ax/OiNIkjF7rI7mk5bKOV/Tu0986INku2UUM=";
+  vendorHash = "sha256-59KQ110upkwGIVfIz8YbgXg11FofJlDQwrah0sSgtf8=";
   ldflags = [
     "-X main.Version=v${finalAttrs.version}"
     "-s"
