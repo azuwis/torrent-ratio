@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/elazarl/goproxy v1.9.2
 	github.com/kr/pretty v0.3.1
-	github.com/mattn/go-sqlite3 v1.14.52
+	github.com/mattn/go-sqlite3 v1.14.53
 	golang.org/x/crypto v0.58.0
 	gopkg.in/yaml.v2 v2.4.0
 )
