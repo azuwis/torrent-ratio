@@ -51,9 +51,8 @@ jobs:
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
     - uses: azuwis/actions/nix@main
-      with:
-        key: nix-${{ matrix.gosystem }}
-        debug: ${{ inputs.debug }}
+    - uses: azuwis/actions/debug@main
+      if: ${{ inputs.debug }}
     - uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
       with:
         name: azuwis
@@ -96,7 +95,6 @@ jobs:
       with:
         name: torrent-ratio-${{ env.GOSYSTEM }}
         path: ./result/bin/*
-    - uses: azuwis/actions/nix/post@main
   release:
     if: ${{ startsWith(github.ref, 'refs/tags/') }}
     needs: build
