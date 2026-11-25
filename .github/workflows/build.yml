@@ -33,6 +33,7 @@ on:
 jobs:
   build:
     permissions:
+      actions: read
       contents: write
     strategy:
       fail-fast: false
@@ -53,10 +54,7 @@ jobs:
     - uses: azuwis/actions/nix@main
     - uses: azuwis/actions/debug@main
       if: ${{ inputs.debug }}
-    - uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
-      with:
-        name: azuwis
-        authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+    - uses: Mic92/hestia@dfed9ced335d28978ba74e513939a10db1f71025 # v3.1.0
     - name: Update vendorHash if needed
       env:
         GH_TOKEN: ${{ github.token }}
